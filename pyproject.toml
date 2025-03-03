@@ -6,15 +6,15 @@ version = "0.0.7"
 requires-python = ">=3.7"
 license = {file = "LICENSE"}
 authors = [
-    {name = "Yacine Haddad", email = "yacine.haddad@cern.ch"}
-    {name = "Yixiao Han", email = "yixiao.han@cern.ch"}
-    {name = "Israr Israr", email = "israr.i@northeastern.edu"}
+    {name = "Yacine Haddad", email = "yacine.haddad@cern.ch"},
+    {name = "Yixiao Han", email = "yixiao.han@cern.ch"},
+    {name = "Israr Israr", email = "israr.i@northeastern.edu"},
     {name = "Nick Manganelli", email = "nmangane@cern.ch"}
 ]
 maintainers = [
-    {name = "Yacine Haddad", email = "yacine.haddad@cern.ch"}
-    {name = "Yixiao Han", email = "yixiao.han@cern.ch"}
-    {name = "Israr Israr", email = "israr.i@northeastern.edu"}
+    {name = "Yacine Haddad", email = "yacine.haddad@cern.ch"},
+    {name = "Yixiao Han", email = "yixiao.han@cern.ch"},
+    {name = "Israr Israr", email = "israr.i@northeastern.edu"},
     {name = "Nick Manganelli", email = "nmangane@cern.ch"}
 ]
 classifiers = [
