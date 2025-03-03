@@ -1,0 +1,61 @@
+[project]
+name = "Qawa"
+description = "Algerian coffee is called qawa"
+readme = "README.md"
+version = "0.0.7"
+requires-python = ">=3.7"
+license = {file = "LICENSE"}
+authors = [
+    {name = "Yacine Haddad", email = "yacine.haddad@cern.ch"}
+    {name = "Yixiao Han", email = "yixiao.han@cern.ch"}
+    {name = "Israr Israr", email = "israr.i@northeastern.edu"}
+    {name = "Nick Manganelli", email = "nmangane@cern.ch"}
+]
+maintainers = [
+    {name = "Yacine Haddad", email = "yacine.haddad@cern.ch"}
+    {name = "Yixiao Han", email = "yixiao.han@cern.ch"}
+    {name = "Israr Israr", email = "israr.i@northeastern.edu"}
+    {name = "Nick Manganelli", email = "nmangane@cern.ch"}
+]
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Topic :: Scientific/Engineering"
+]
+dependencies = [
+    "coffea>=0.7.15",
+    "vector",
+    "onnxruntime",
+    "scipy"
+]
+
+[build-system]
+requires = ["setuptools>=75.8.2", "wheel"]
+build-backend = "setuptools.build_meta"
+# requires = ["hatchling"]
+# build-backend = "hatchling.build"
+
+
+[tool.setuptools]
+include-package-data = true
+package-dir = {"" = "src"}
+# version.path = "src/qawa/__init__.py"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["*"]
+
+[tool.flake8]
+ignore = ["E203", "E231", "E501", "E722", "W503", "B950"]
+select = ["C", "E", "F", "W", "T", "B", "B9", "I"]
+per-file-ignores = {"tests/*" = ["T"]}
+
