@@ -3,6 +3,8 @@
 if [[ "$1" == "zsh" ]]; then
     cat <<EOF > shell
 #!/usr/bin/env zsh
+
+export INSTALL_LOC_EXTERNAL=\$PWD
 export INSTALL_LOC=/srv/
 export ZDOTDIR=\$INSTALL_LOC
 
@@ -11,6 +13,7 @@ else
     cat <<EOF > shell
 #!/usr/bin/env bash
 
+export INSTALL_LOC_EXTERNAL=\$PWD
 export INSTALL_LOC=/srv/
 
 EOF
@@ -36,6 +39,7 @@ fi
 
 cat <<EOF >> shell
 voms-proxy-init -voms cms --valid 192:00 --out \$HOME/x509up_u\$UID
+export X509_USER_PROXY=\$HOME/x509up_u\$UID
 
 if [[ "\$1" == "" ]]; then
   # export COFFEA_IMAGE="coffeateam/coffea-dask:0.7.22-py3.10-g7f049"
