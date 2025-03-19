@@ -1,5 +1,6 @@
 from coffea import processor
 from coffea import nanoevents
+from coffea.nanoevents import NanoAODSchema, BaseSchema
 from qawa.process.wztau2lnu_inclusive import wzinclusive_processor
 from qawa.process.coffea_sumw import coffea_sumw
 import argparse
@@ -8,6 +9,8 @@ import gzip
 import re, sys
 import uproot
 import numpy as np
+
+NanoAODSchema.warn_missing_crossrefs = False
 
 np.seterr(all='ignore')
 
@@ -53,11 +56,21 @@ def main():
     parser.add_argument('--infile' ,   type=str, default=None  , help="input root file")
     parser.add_argument('--dataset',   type=str, default=None  , help="dataset name. need to specify if file is not in EOS")
     parser.add_argument('--runperiod', type=str, default=None)
+    parser.add_argument('--executor' , type=str, default="FuturesExecutor", help="Executor to use, one of IterativeExecutor (good for debugging), FuturesExecutor (multithreaded), or other coffea option")
 
     options = parser.parse_args()
 
     if options.dataset is None: 
         options.dataset = options.infile.split('/')[4]
+    executor = None
+    if options.executor == "FuturesExecutor":
+        executor = processor.FuturesExecutor(workers=8,)
+    elif options.executor == "IterativeExecutor":
+        executor = processor.IterativeExecutor()
+    elif options.executor == "DaskExecutor":
+        executor = processor.DaskExecutor()
+    else:
+        raise ValueError(f"Invalid Executor option {options.executor}")
 
     era=options.era
     is_data = not options.isMC
@@ -91,19 +104,16 @@ def main():
                     }
                 }
             }
-            
-            
-            sumw_out = processor.run_uproot_job(
-                samples,
-                treename="Runs",
-                processor_instance=coffea_sumw(),
-                executor=processor.futures_executor,
-                executor_args={
-                    "schema" : nanoevents.BaseSchema,
-                    "workers": 8,
-                    "desc": "SumW"
-                },
+
+            sumw_runner = processor.Runner(
+                executor=executor,
+                schema=BaseSchema,
+                format="root",
             )
+            sumw_out = sumw_runner(samples,
+                                   "Runs",
+                                   processor_instance=coffea_sumw(),
+                                   )
             
             ewk_flag = None
             if "ZZTo" in options.infile and "GluGluTo" not in options.infile and "ZZJJ" not in options.infile:
@@ -127,27 +137,26 @@ def main():
                 -- in file  = {aliases[ixrd] + options.infile}
                 -- dataset  = {options.dataset}
                 -- period   = {options.runperiod}
+                -- executor = {options.executor}
                 ---------------------------"""
             )
 
             print(" --- wztau2lnu_inclusive processor ... ")
-            vbs_out = processor.run_uproot_job(
-                samples,
-                processor_instance=wzinclusive_processor(
-                    era=options.era,
-                    ewk_process_name=ewk_flag,
-                    run_period=options.runperiod if is_data else ''
-                ),
-                treename='Events',
-                executor=processor.futures_executor,
-                executor_args={
-                    "schema" : nanoevents.NanoAODSchema,
-                    "workers": 8,
-                    "desc": "WZinC"
-                },
+            vbs_runner = processor.Runner(
+                executor=executor,
+                schema=NanoAODSchema,
                 chunksize=100000,
                 # maxchunks=5
+                format="root",
             )
+            vbs_out = vbs_runner(samples,
+                                 "Events",
+                                 processor_instance=wzinclusive_processor(
+                                     era=options.era,
+                                     ewk_process_name=ewk_flag,
+                                     run_period=options.runperiod if is_data else ''
+                                 ),
+                                 )
             bh_output = {}
             for key, content in vbs_out.items():
                 bh_output[key] = {
@@ -157,7 +166,8 @@ def main():
             with gzip.open("histogram_%s.pkl.gz" % str(options.jobNum), "wb") as f:
                 pickle.dump(bh_output, f)
             failed=False
-        except:
+        except Exception as e:
+            print(e)
             print(f"[WARNING] {aliases[ixrd]} failed with the following error : ")
             print(sys.exc_info()[0])
             #print(f"Unexpected {err=}, {type(err)=}")
