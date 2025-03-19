@@ -42,8 +42,7 @@ voms-proxy-init -voms cms --valid 192:00 --out \$HOME/x509up_u\$UID
 export X509_USER_PROXY=\$HOME/x509up_u\$UID
 
 if [[ "\$1" == "" ]]; then
-  # export COFFEA_IMAGE="coffeateam/coffea-dask:0.7.22-py3.10-g7f049"
-  export COFFEA_IMAGE="coffeateam/coffea-dask:0.7.22-py3.10-ga998f"
+  export COFFEA_IMAGE="coffeateam/coffea-base-almalinux9:0.7.26-py3.10"
 else
   export COFFEA_IMAGE="\$1"
 fi
