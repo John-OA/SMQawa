@@ -38,9 +38,6 @@ EOF
 fi
 
 cat <<EOF >> shell
-# To get dasgoclient
-export PATH=$PATH:/cvmfs/cms.cern.ch/common
-
 voms-proxy-init -voms cms --valid 192:00 --out \$HOME/x509up_u\$UID
 export X509_USER_PROXY=\$HOME/x509up_u\$UID
 
@@ -65,6 +62,10 @@ fi
 
 if [[ "$1" == "zsh" ]]; then
     cat <<EOF > .zshrc
+# To get dasgoclient
+export PATH=\$PATH:/cvmfs/cms.cern.ch/common
+export PYTHONPATH=\$INSTALL_LOC.env/bin
+
 export XRDPARALLELEVTLOOP=16 #This might only work in development environments, but should increase the throughput...
 # export INSTALL_LOC=\$PWD/ #this could potentially be VIRTUAL_ENV, but creating that prior to activation may cause unforeseen problems... note TRAILING slash
 if [[ -z "\$INSTALL_LOC" ]]; then
@@ -82,9 +83,13 @@ install_env() {
   set -e
   echo "Installing shallow virtual environment in \$PWD/.env..."
   python -m venv --without-pip --system-site-packages \$INSTALL_LOC.env
+  source \$INSTALL_LOC.env/bin/activate
   unlink \$INSTALL_LOC.env/lib64  # HTCondor can't transfer symlink to directory and it appears optional
   cd \${INSTALL_LOC}
-  git clone -b smqawa-zz2l2nu http://github.com/NJManganelli/coffea.git
+  if [ ! -d "coffea" ]; then
+    echo "Cloning coffea for editable install"
+    git clone -b smqawa-zz2l2nu http://github.com/NJManganelli/coffea.git
+  fi
   cd coffea
   \$INSTALL_LOC.env/bin/python -m pip install -e .
   cd ..
@@ -107,7 +112,7 @@ install_env() {
 install_kernel() {
   # work around issues copying CVMFS xattr when copying to tmpdir
   export TMPDIR=\$(mktemp -d -p .)
-  \$INSTALL_LOC.env/bin/python -m ipykernel install --user --name smqawa --display-name "smqawa" --env PYTHONPATH $PYTHONPATH:$PWD --env PYTHONNOUSERSITE 1
+  \$INSTALL_LOC.env/bin/python -m ipykernel install --user --name smqawa --display-name "smqawa" --env PYTHONPATH \$PYTHONPATH:\$PWD --env PYTHONNOUSERSITE 1
   rm -rf \$TMPDIR && unset TMPDIR
 }
 
@@ -133,6 +138,10 @@ EOF
     echo "Wrote shell and .zshrc to current directory. Run ./shell to start the singularity shell"
 else
     cat <<EOF > .bashrc
+# To get dasgoclient
+export PATH=\$PATH:/cvmfs/cms.cern.ch/common
+export PYTHONPATH=\$INSTALL_LOC.env/bin
+
 export XRDPARALLELEVTLOOP=16 #This might only work in development environments, but should increase the throughput...
 # export INSTALL_LOC=\$PWD/ #this could potentially be VIRTUAL_ENV, but creating that prior to activation may cause unforeseen problems... note TRAILING slash
 if [[ -z "\$INSTALL_LOC" ]]; then
@@ -146,9 +155,13 @@ install_env() {
   set -e
   echo "Installing shallow virtual environment in \$INSTALL_LOC.env..."
   python -m venv --without-pip --system-site-packages \$INSTALL_LOC.env
+  source \$INSTALL_LOC.env/bin/activate
   unlink \$INSTALL_LOC.env/lib64  # HTCondor can't transfer symlink to directory and it appears optional
   cd \${INSTALL_LOC}
-  git clone -b smqawa-zz2l2nu http://github.com/NJManganelli/coffea.git
+  if [ ! -d "coffea" ]; then
+    echo "Cloning coffea for editable install"
+    git clone -b smqawa-zz2l2nu http://github.com/NJManganelli/coffea.git
+  fi
   cd coffea
   \$INSTALL_LOC.env/bin/python -m pip install -e .
   cd ..
@@ -171,7 +184,7 @@ install_env() {
 install_kernel() {
   # work around issues copying CVMFS xattr when copying to tmpdir
   export TMPDIR=\$(mktemp -d -p .)
-  \$INSTALL_LOC.env/bin/python -m ipykernel install --user --name smqawa --display-name "smqawa" --env PYTHONPATH $PYTHONPATH:$PWD --env PYTHONNOUSERSITE 1
+  \$INSTALL_LOC.env/bin/python -m ipykernel install --user --name smqawa --display-name "smqawa" --env PYTHONPATH \$PYTHONPATH:\$PWD --env PYTHONNOUSERSITE 1
   rm -rf \$TMPDIR && unset TMPDIR
 }
 
@@ -188,7 +201,7 @@ export IPYTHONDIR=\$INSTALL_LOC.ipython
 unset GREP_OPTIONS
 
 [[ -d .env ]] || install_all
-source .env/bin/activate
+source \$INSTALL_LOC.env/bin/activate
 alias pip="python -m pip"
 
 EOF
