@@ -1,7 +1,7 @@
 # Installation
-git clone this project into a folder which will include several other repos, then execute the bootstrap file with arguments <shell> and <location>.
-<shell> is one of `zsh` or `bash`, matching your default shell
-<location> is one of `lpc` or `lxplus` and must match where you're working from to setup bind paths correctly
+git clone this project into a folder which will include several other repos, then execute the bootstrap file with arguments `<shell>` and `<location>`.
+`<shell>` is one of `zsh` or `bash`, matching your default shell
+`<location>` is one of `lpc` or `lxplus` and must match where you're working from to setup bind paths correctly
 
 ## One-time Setup
 Perform initial git clone, and use bootstrap.zsh to create shell and (.zshrc or .bashrc) profiles.
@@ -12,6 +12,7 @@ The profiles implicitly create the python virtual environment when none is alrea
 export INSTALL_LOC_EXTERNAL=$PWD/WZAnalysis
 mkdir -p $INSTALL_LOC_EXTERNAL
 cd $INSTALL_LOC_EXTERNAL
+git clone -b <branch_name> git@github.com:<githubusername>/DCTools.git
 git clone -b <branch_name> git@github.com:<githubusername>/SMQawa.git
 zsh SMQawa/bootstrap.zsh <shell> <location>
 ```
