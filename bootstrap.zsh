@@ -38,6 +38,9 @@ EOF
 fi
 
 cat <<EOF >> shell
+# To get dasgoclient
+export PATH=$PATH:/cvmfs/cms.cern.ch/common
+
 voms-proxy-init -voms cms --valid 192:00 --out \$HOME/x509up_u\$UID
 export X509_USER_PROXY=\$HOME/x509up_u\$UID
 
@@ -92,10 +95,12 @@ install_env() {
   fi
   cd SMQawa
   \$INSTALL_LOC.env/bin/python -m pip install -e .
-  # mkdir -p build
-  # \$INSTALL_LOC.env/bin/python -m pip wheel --no-deps .
-  # \$INSTALL_LOC.env/bin/python -m pip install Qawa*.whl
   cd ..
+  \$INSTALL_LOC.env/bin/python -m pip install --upgrade 'boost_histogram >= 1.5.1'
+  if [ ! -d "DCTools" ]; then
+    echo "DCTools should be cloned into the directory adjacent to SMQawa to enable combine card building and postfit plotting"
+    echo "e.g. git clone -b master git@github.com:yhaddad/DCTools.git"
+  fi
   echo "done."
 }
 
@@ -154,10 +159,12 @@ install_env() {
   fi
   cd SMQawa
   \$INSTALL_LOC.env/bin/python -m pip install -e .
-  # mkdir -p build
-  # \$INSTALL_LOC.env/bin/python -m pip wheel --no-deps .
-  # \$INSTALL_LOC.env/bin/python -m pip install Qawa*.whl
   cd ..
+  \$INSTALL_LOC.env/bin/python -m pip install --upgrade 'boost_histogram >= 1.5.1'
+  if [ ! -d "DCTools" ]; then
+    echo "DCTools should be cloned into the directory adjacent to SMQawa to enable combine card building and postfit plotting"
+    echo "e.g. git clone -b master git@github.com:yhaddad/DCTools.git"
+  fi
   echo "done."
 }
 
