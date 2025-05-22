@@ -3,6 +3,9 @@
 if [[ "$1" == "zsh" ]]; then
     cat <<EOF > shell
 #!/usr/bin/env zsh
+autoload bashcompinit
+bashcompinit
+source SMQawa/call_host.zsh
 
 export INSTALL_LOC_EXTERNAL=\$PWD
 export INSTALL_LOC=/srv/
@@ -12,6 +15,7 @@ EOF
 else
     cat <<EOF > shell
 #!/usr/bin/env bash
+source SMQawa/call_host.sh
 
 export INSTALL_LOC_EXTERNAL=\$PWD
 export INSTALL_LOC=/srv/
@@ -52,16 +56,24 @@ EOF
 
 if [[ "$1" == "zsh" ]]; then
     cat <<EOF >> shell
-SINGULARITY_SHELL=\$(which zsh) singularity exec -B \${PWD}:/srv --pwd /srv \${FULL_IMAGE} $(which zsh)
+SINGULARITY_SHELL=\$(which zsh) apptainer exec -B \${PWD}:/srv --pwd /srv \${FULL_IMAGE} $(which zsh)
 EOF
 else
     cat <<EOF >> shell
-SINGULARITY_SHELL=\$(which bash) singularity exec -B \${PWD}:/srv --pwd /srv \${FULL_IMAGE} $(which bash) --rcfile /srv/.bashrc
+SINGULARITY_SHELL=\$(which bash) apptainer exec -B \${PWD}:/srv --pwd /srv \${FULL_IMAGE} $(which bash) --rcfile /srv/.bashrc
 EOF
 fi
 
 if [[ "$1" == "zsh" ]]; then
     cat <<EOF > .zshrc
+if [ ! -d "SMQawa" ]; then
+  echo "SMQawa must already be cloned, e.g. via 'git clone -b <branch> git@github.com:<githubusername>/SMQawa.git'"
+  echo "the bootstrap.zsh script should be run from the parent folder of SMQawa to allow editable install of coffea and other packages alongside it."
+  echo "clean the virtual env before re-attempting install."
+fi
+# Source the call_host script again inside the container
+source SMQawa/call_host.zsh
+
 # To get dasgoclient
 export PATH=\$PATH:/cvmfs/cms.cern.ch/common
 export PYTHONPATH=\$INSTALL_LOC.env/bin
@@ -93,11 +105,6 @@ install_env() {
   cd coffea
   \$INSTALL_LOC.env/bin/python -m pip install -e .
   cd ..
-  if [ ! -d "SMQawa" ]; then
-    echo "SMQawa must already be cloned, e.g. via 'git clone -b <branch> git@github.com:<githubusername>/SMQawa.git'"
-    echo "the bootstrap.zsh script should be run from the parent folder of SMQawa to allow editable install of coffea and other packages alongside it."
-    echo "clean the virtual env before re-attempting install."
-  fi
   cd SMQawa
   \$INSTALL_LOC.env/bin/python -m pip install -e .
   cd ..
@@ -134,10 +141,19 @@ alias pip="python -m pip"
 
 EOF
     curl -L https://iterm2.com/shell_integration/zsh -o ~/.iterm2_shell_integration.zsh
-    chmod u+x shell .zshrc
-    echo "Wrote shell and .zshrc to current directory. Run ./shell to start the singularity shell"
+    mv shell zsh-shell
+    chmod u+x zsh-shell .zshrc
+    echo "Wrote zsh-shell and .zshrc to current directory. Run ./zsh-shell to start the apptainer shell"
 else
     cat <<EOF > .bashrc
+if [ ! -d "SMQawa" ]; then
+  echo "SMQawa must already be cloned, e.g. via 'git clone -b <branch> git@github.com:<githubusername>/SMQawa.git'"
+  echo "the bootstrap.zsh script should be run from the parent folder of SMQawa to allow editable install of coffea and other packages alongside it."
+  echo "clean the virtual env before re-attempting install."
+fi
+# Source the call_host script again inside the container
+source SMQawa/call_host.sh
+
 # To get dasgoclient
 export PATH=\$PATH:/cvmfs/cms.cern.ch/common
 export PYTHONPATH=\$INSTALL_LOC.env/bin
@@ -165,11 +181,6 @@ install_env() {
   cd coffea
   \$INSTALL_LOC.env/bin/python -m pip install -e .
   cd ..
-  if [ ! -d "SMQawa" ]; then
-    echo "SMQawa must already be cloned, e.g. via 'git clone -b <branch> git@github.com:<githubusername>/SMQawa.git'"
-    echo "the bootstrap.zsh script should be run from the parent folder of SMQawa to allow editable install of coffea and other packages alongside it."
-    echo "clean the virtual env before re-attempting install."
-  fi
   cd SMQawa
   \$INSTALL_LOC.env/bin/python -m pip install -e .
   cd ..
@@ -205,6 +216,7 @@ source \$INSTALL_LOC.env/bin/activate
 alias pip="python -m pip"
 
 EOF
-    chmod u+x shell .bashrc
-    echo "Wrote shell and .bashrc to current directory. Run ./shell to start the singularity shell"
+    mv shell bash-shell
+    chmod u+x bash-shell .bashrc
+    echo "Wrote bash-shell and .bashrc to current directory. Run ./bash-shell to start the apptainer shell"
 fi
