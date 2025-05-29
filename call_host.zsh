@@ -181,8 +181,9 @@ call_host() {
     FUNCTMP="${funcstack[1]}"
   fi
 
-  # Send the command to the host pipe
-  print -r -- "cd $PWD; $FUNCTMP $*" > "$HOSTPIPE"
+  # Send the command to the host pipe  
+  # print -r -- "cd $PWD; $FUNCTMP $*" > "$HOSTPIPE" #breaks if on a remapped location in the container, e.g. $HOME:/srv
+  print -r -- "cd ${PWD//$INSTALL_LOC/$INSTALL_LOC_EXTERNAL}; $FUNCTMP $*" > "$HOSTPIPE"
 
   # Read and print the response from the control pipe
   cat < "$CONTPIPE"
