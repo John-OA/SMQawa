@@ -41,7 +41,7 @@ echo "----- XRD_REQUESTTIMEOUT : $XRD_REQUESTTIMEOUT"
 ls -lthr
 
 echo "----- processing the files : "
-$INSTALL_LOC_EXTERNAL/.env/bin/python3 brewer-remote-inclusive.py --jobNum=$1 --isMC={ismc} --era={era} --infile=$2
+$INSTALL_LOC_EXTERNAL/.env/bin/python3 brewer-remote-inclusive.py --jobNum=$1 --isMC={ismc} --era={era} --infile=$2 --executor={executor}
 
 echo "----- directory after running :"
 ls -lthr
@@ -82,15 +82,17 @@ queue jobfn from {jobdir}/inputfiles.dat
 
 def main():
     parser = argparse.ArgumentParser(description='Famous Submitter')
-    parser.add_argument("-i"   , "--input" , type=str, default="data.txt" , help="input datasets", required=True)
-    parser.add_argument("-t"   , "--tag"   , type=str, default="atakour"  , help="production tag", required=True)
-    parser.add_argument("-isMC", "--isMC"  , type=int, default=1          , help="")
-    parser.add_argument("-q"   , "--queue" , type=str, default="longlunch", help="")
-    parser.add_argument("-e"   , "--era"   , type=str, default="2018"     , help="")
-    parser.add_argument("-f"   , "--force" , action="store_true"          , help="recreate files and jobs")
-    parser.add_argument("-s"   , "--submit", action="store_true"          , help="submit only")
-    parser.add_argument("-dry" , "--dryrun", action="store_true"          , help="running without submission")
-    parser.add_argument("--redo-proxy"     , action="store_true"          , help="redo the voms proxy")
+    parser.add_argument("-i"   , "--input" , type=str, default="data.txt"       , help="input datasets", required=True)
+    parser.add_argument("-t"   , "--tag"   , type=str, default="atakour"        , help="production tag", required=True)
+    parser.add_argument("-isMC", "--isMC"  , type=int, default=1                , help="")
+    parser.add_argument("-q"   , "--queue" , type=str, default="longlunch"      , help="")
+    parser.add_argument("-e"   , "--era"   , type=str, default="2018"           , help="")
+    parser.add_argument("-f"   , "--force" , action="store_true"                , help="recreate files and jobs")
+    parser.add_argument("-s"   , "--submit", action="store_true"                , help="submit only")
+    parser.add_argument("-dry" , "--dryrun", action="store_true"                , help="running without submission")
+    parser.add_argument("--redo-proxy"     , action="store_true"                , help="redo the voms proxy")
+    parser.add_argument("-ex", "--executor", type=str, default="FuturesExecutor", help="coffea executor to use",
+                        choices=["FuturesExecutor","IterativeExecutor","DaskExecutor"])
     options = parser.parse_args()
 
     # Making sure that the proxy is good
@@ -131,6 +133,13 @@ def main():
 
 
     with open(options.input, 'r') as stream:
+        captured_env = os.environ.copy()
+        if "bash" in captured_env['SHELL']:
+            to_source = os.path.join(captured_env['INSTALL_LOC'], ".bashrc")
+        elif "zsh" in captured_env['SHELL']:
+            to_source = os.path.join(captured_env['INSTALL_LOC'], ".zshrc")
+        else:
+            raise NotImplementedError("neither bash or zsh detected in the shell env variable, something has gone wrong; contents=", captured_env['SHELL'])
         for sample in stream.read().split('\n'):
             if '#' in sample: continue
             if len(sample.split('/')) <= 1: continue
@@ -192,6 +201,7 @@ def main():
                     coffea_image=coffea_image,
                     full_image=full_image,
                     install_loc_external=install_loc_external,
+                    executor=options.executor,
                 )
                 scriptfile.write(script)
                 scriptfile.close()
@@ -211,19 +221,24 @@ def main():
                 continue
 
             try:
+                cmd = f"cd {captured_env['INSTALL_LOC']} && source {to_source} && condor_submit {os.path.join(jobs_dir_external, 'condor.sub')}"
+                logging.info(f"condor command : {cmd}")
                 htc = subprocess.Popen(
-                    # "condor_submit " + os.path.join(jobs_dir, "condor.sub"),
-                    "condor_submit " + os.path.join(jobs_dir_external, "condor.sub"),
-                    shell  = True,
-                    stdin  = subprocess.PIPE,
-                    stdout = subprocess.PIPE,
-                    stderr = subprocess.PIPE,
-                    close_fds=True
+                    cmd,
+                    shell      = True,
+                    executable = captured_env['SHELL'],
+                    env        = captured_env,
+                    stdin      = subprocess.PIPE,
+                    stdout     = subprocess.PIPE,
+                    stderr     = subprocess.PIPE,
+                    close_fds  =True
                 )
 
-                htc.communicate()
+                htc_out, htc_err = htc.communicate()
                 exit_status = htc.returncode
-                logging.info("condor submission status : {}".format(exit_status))
+                logging.info(f"condor submission status : {exit_status}")
+                logging.info(f"condor communicate stdout : {htc_out}")
+                logging.info(f"condor communicate stderr : {htc_err}")
             except Exception as e:
                 print(f"HTCondor submission error: {e}")
 
