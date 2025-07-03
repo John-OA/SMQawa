@@ -19,10 +19,11 @@ def validate_input_file(nanofile):
     pfn = nanofile
     pfn=re.sub("\n","",pfn)
     aliases = [
-        "root://eoscms.cern.ch/",
-        "root://xrootd-cms.infn.it/",
-        "root://cmsxrootd.fnal.gov/"
-        "root://cms-xrd-global.cern.ch/",
+        "",
+        # "root://eoscms.cern.ch/",
+        # "root://xrootd-cms.infn.it/",
+        # "root://cmsxrootd.fnal.gov/"
+        # "root://cms-xrd-global.cern.ch/",
     ]
 
     valid = False
@@ -90,14 +91,15 @@ def main():
     failed = True
     ixrd = 0
     aliases = [
+        "",
         "root://eoscms.cern.ch/",
-        "root://llrxrd-redir.in2p3.fr/",
-        "root://xrootd-cms.infn.it/",
-        "root://cms-xrd-global01.cern.ch/", 
-        "root://cms-xrd-global02.cern.ch/",
-        "root://cmsxrootd.fnal.gov/",
-        "root://xrootd-cms-redir-int.cr.cnaf.infn.it/",
-        "root://xrootd-redic.pi.infn.it/"
+        # "root://llrxrd-redir.in2p3.fr/",
+        # "root://xrootd-cms.infn.it/",
+        # "root://cms-xrd-global01.cern.ch/", 
+        # "root://cms-xrd-global02.cern.ch/",
+        # "root://cmsxrootd.fnal.gov/",
+        # "root://xrootd-cms-redir-int.cr.cnaf.infn.it/",
+        # "root://xrootd-redic.pi.infn.it/"
     ]
     while failed:
         try:
@@ -128,6 +130,8 @@ def main():
                     "workers": 8,
                     "desc": "SumW"
                 },
+                # chunksize=10000,
+                # maxchunks=30
             )
             
             ewk_flag = None
@@ -137,7 +141,7 @@ def main():
                 ewk_flag = 'WZ'
 
             DY_flag = False
-            if options.dd != 'MC':
+            if options.isMC:
                 if "DYJetsToLL" in options.infile:
                     DY_flag = True
 
@@ -155,7 +159,7 @@ def main():
                 ---------------------------"""
             )
 
-            print(" --- zz2l2nu_vbs processor ... ")
+            print(" --- zz2l2nu_vbs processor ... ",samples)
             vbs_out = processor.run_uproot_job(
                 samples,
                 processor_instance=zzinc_processor(
@@ -173,7 +177,8 @@ def main():
                     "workers": 8,
                     "desc": "ZZinC"
                 },
-                #chunksize=50000,
+                # chunksize=10,
+                # maxchunks=2
             )
             bh_output = {}
             for key, content in vbs_out.items():

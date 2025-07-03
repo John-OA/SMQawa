@@ -8,17 +8,18 @@ import importlib.metadata
 
 logging.basicConfig(level=logging.DEBUG)
 
-qawa_version = importlib.metadata.version('qawa')
-#qawa_version = '0.0.5'
-
+# qawa_version = importlib.metadata.version('qawa')
+qawa_version = '0.0.7'
 
 script_TEMPLATE_data = """#!/bin/bash
 export X509_USER_PROXY={proxy}
 export XRD_REQUESTTIMEOUT=6400
 export XRD_REDIRECTLIMIT=64
+export PYTHONPATH=/afs/cern.ch/user/h/hgao/.local/lib/python3.10/site-packages:$PYTHONPATH
 
 voms-proxy-info -all
 voms-proxy-info -all -file {proxy}
+
 
 python -m venv --without-pip --system-site-packages jobenv
 source jobenv/bin/activate
@@ -30,25 +31,18 @@ echo "----- X509_USER_PROXY    : $X509_USER_PROXY"
 echo "----- XRD_REDIRECTLIMIT  : $XRD_REDIRECTLIMIT"
 echo "----- XRD_REQUESTTIMEOUT : $XRD_REQUESTTIMEOUT"
 ls -lthr
-echo "----- download the file locally"
-aliases=("root://llrxrd-redir.in2p3.fr/" "root://xrootd-cms.infn.it/" "root://cms-xrd-global01.cern.ch/" "root://cms-xrd-global02.cern.ch/" "root://cmsxrootd.fnal.gov/" "root://xrootd-cms-redir-int.cr.cnaf.infn.it/" "root://xrootd-redic.pi.infn.it/")
-while [ ! -e "$(basename "$2")" ]; do
-    for aliase in "${{aliases[@]}}"; do
-        echo $aliase/$2
-        xrdcp $aliase/$2 ./
-        if [ $? -eq 0 ]; then
-            break
-        else
-            continue
-        fi
-    done
-done
-echo "----- processing the files : "
+echo "----- this is a data file"
 filepath=$2
-dataset=$(echo "$filepath" | awk -F'/' '{{print $5}}')
-runperiod=$(echo "$filepath" | awk -F'/' '{{print $4}}' | awk '{{print substr($0, length, 1)}}')
-python brewer-remote.py --jobNum=$1 --isMC={ismc} --era={era} --infile=$(basename "$filepath") --dataset=$dataset --runperiod=$runperiod
-rm $(basename "$filepath")
+echo "----- processing the files : "
+dataset=$(echo "$filepath" | awk -F'/{era}/' '{{print $2}}' | awk -F'/' '{{print $1}}' | awk -F'_' '{{print $1}}')
+runperiod=$(echo "$filepath" | awk -F'/{era}/' '{{print $2}}' | awk -F'_' '{{split($2, a, "-"); print substr(a[1], length(a[1]), 1)}}')
+
+mkdir -p /tmp/hgao/$dataset
+a=$(basename $2)
+cp $2 /tmp/hgao/$dataset
+ls -lthr /tmp/hgao/$dataset/
+python brewer-remote.py --jobNum=$1 --isMC={ismc} --era={era} --dd={dd} --infile=/tmp/hgao/$dataset/$a --dataset=$dataset --runperiod=$runperiod 
+rm /tmp/hgao/$dataset/*
 echo "----- directory after running :"
 ls -lthr
 if [ ! -f "histogram_$1.pkl.gz" ]; then
@@ -61,6 +55,7 @@ script_TEMPLATE_MC = """#!/bin/bash
 export X509_USER_PROXY={proxy}
 export XRD_REQUESTTIMEOUT=6400
 export XRD_REDIRECTLIMIT=64
+export PYTHONPATH=/afs/cern.ch/user/h/hgao/.local/lib/python3.10/site-packages:$PYTHONPATH
 
 voms-proxy-info -all
 voms-proxy-info -all -file {proxy}
@@ -75,23 +70,18 @@ echo "----- X509_USER_PROXY    : $X509_USER_PROXY"
 echo "----- XRD_REDIRECTLIMIT  : $XRD_REDIRECTLIMIT"
 echo "----- XRD_REQUESTTIMEOUT : $XRD_REQUESTTIMEOUT"
 ls -lthr
-echo "----- download the file locally"
-aliases=("root://llrxrd-redir.in2p3.fr/" "root://xrootd-cms.infn.it/" "root://cms-xrd-global01.cern.ch/" "root://cms-xrd-global02.cern.ch/" "root://cmsxrootd.fnal.gov/" "root://xrootd-cms-redir-int.cr.cnaf.infn.it/" "root://xrootd-redic.pi.infn.it/")
-while [ ! -e "$(basename "$2")" ]; do
-    for aliase in "${{aliases[@]}}"; do
-        echo $aliase/$2
-        xrdcp $aliase/$2 ./
-        if [ $? -eq 0 ]; then
-            break
-        else
-            continue
-        fi
-    done
-done
-echo "----- processing the files : "
+echo "----- this is a MC file"
 filepath=$2
-python brewer-remote.py --jobNum=$1 --isMC={ismc} --era={era} --infile=$(basename "$filepath") --dataset=$(echo "$filepath" | awk -F'/' '{{print $5}}') --runperiod=
-rm $(basename "$filepath")
+echo "----- processing the files : "
+dataset=$(echo "$filepath" | awk -F'/{era}/' '{{print $2}}' | awk -F'/' '{{print $1}}')
+
+mkdir -p /tmp/hgao/$dataset
+a=$(basename $2)
+cp $2 /tmp/hgao/$dataset
+ls -lthr /tmp/hgao/$dataset/
+python brewer-remote.py --jobNum=$1 --isMC={ismc} --era={era} --dd={dd} --infile=/tmp/hgao/$dataset/$a --dataset=$dataset --runperiod=$runperiod
+rm /tmp/hgao/$dataset/*
+
 echo "----- directory after running :"
 ls -lthr
 if [ ! -f "histogram_$1.pkl.gz" ]; then
@@ -100,14 +90,15 @@ fi
 echo " ------ THE END (everyone dies !) ----- "
 """
 
+
 condor_TEMPLATE = """
 universe              = vanilla
-request_disk          = 10000000
+request_disk          = 1000000000
 
 executable            = {jobdir}/script.sh
 arguments             = $(ProcId) $(jobfn)
 transfer_input_files  = {transfer_file}
-# transfer_output_files = histogram_$(ProcId).pkl.gz 
+# transfer_output_files = df_$(ProcId).parquet 
 should_transfer_files = YES
 WhenToTransferOutput  = ON_EXIT_OR_EVICT
 initialdir            = {jobdir}
@@ -118,10 +109,12 @@ error                 = $(ClusterId).$(ProcId).err
 log                   = $(ClusterId).$(ProcId).log
 
 on_exit_remove        = (ExitBySignal == False) && (ExitCode == 0)
-max_retries           = 2
+max_retries           = 3
+request_memory        = 6000M
 requirements          = Machine =!= LastRemoteHost
 # MY.XRDCP_CREATE_DIR   = True
-+SingularityImage     = "/cvmfs/unpacked.cern.ch/registry.hub.docker.com/coffeateam/coffea-dask:0.7.21-fastjet-3.4.0.1-g6238ea8"
+# +SingularityImage     = "/cvmfs/unpacked.cern.ch/registry.hub.docker.com/coffeateam/coffea-dask:0.7.21-py3.9-gaab39"
++SingularityImage     = "/cvmfs/unpacked.cern.ch/registry.hub.docker.com/coffeateam/coffea-dask:latest"
 +JobFlavour           = "{queue}"
 
 queue jobfn from {jobdir}/inputfiles.dat
@@ -138,6 +131,7 @@ def main():
     parser.add_argument("-s"   , "--submit", action="store_true"          , help="submit only")
     parser.add_argument("-dry" , "--dryrun", action="store_true"          , help="running without submission")
     parser.add_argument("--redo-proxy"     , action="store_true"          , help="redo the voms proxy")
+    parser.add_argument("-d"   , "--dd"    , type=str, default="onlySR"     , help="onlySR,DYSR,MC", required=True)
     options = parser.parse_args()
 
     # Making sure that the proxy is good
@@ -146,6 +140,7 @@ def main():
     user_name  = os.environ['USER']
     proxy_copy = os.path.join(home_base,proxy_base)
     eosbase = f"/eos/user/{user_name[0]}/{user_name}/ZZTo2L2Nu/" + "{tag}/{sample}/"
+    input_base =f'/eos/cms/store/group/phys_smp/ZZTo2L2Nu/HZZsample/{options.era}'
 
     regenerate_proxy = False
     if not os.path.isfile(proxy_copy):
@@ -166,21 +161,21 @@ def main():
     if regenerate_proxy:
         redone_proxy = False
         while not redone_proxy:
-            status = os.system('voms-proxy-init -voms cms')
+            status = os.system('voms-proxy-init --valid 120:00 --rfc --voms cms')
             if os.WEXITSTATUS(status) == 0:
                 redone_proxy = True
         shutil.copyfile('/tmp/'+proxy_base,  proxy_copy)
-
-
     with open(options.input, 'r') as stream:
         for sample in stream.read().split('\n'):
             if '#' in sample: continue
             if len(sample.split('/')) <= 1: continue
             sample_name = sample.split("/")[1] if options.isMC else '_'.join(sample.split("/")[1:3])
             sample_name = sample_name.replace("*", "")
-            jobs_dir = '_'.join(['jobs', options.tag, options.era, sample_name])
+            era_directory = options.era 
+            os.makedirs(f"{era_directory}-SR-v2", exist_ok=True)
+            jobs_dir_sub = '_'.join(['jobs', options.tag, options.era, sample_name])
+            jobs_dir = os.path.join(f"{era_directory}-SR-v2", jobs_dir_sub)
             logging.info("-- sample_name : " + sample)
-
             if os.path.isdir(jobs_dir):
                 if not options.force:
                     logging.error(" " + jobs_dir + " already exist !")
@@ -196,27 +191,30 @@ def main():
                 sample_files = []
                 if '*' in sample:
                     sample_with_ext = subprocess.check_output(
-                        ['dasgoclient', '--query', f"dataset={sample}"]
+                        ['ls', f"{input_base}/{sample_name}"]
                     )
                     print(" --- found these samples : ")
                     print(sample_with_ext.decode('UTF-8'))
                     print("and these are the files : ")
                     for sample_ in sample_with_ext.decode("UTF-8").split("\n")[:-1]:
                         output_ = subprocess.check_output(
-                            ['dasgoclient', '--query', f'file dataset={sample_}']
+                            ['ls',f"{input_base}/{sample_}"]
                         )
                         sample_files += list(filter(lambda x: x != '', output_.decode('UTF-8').split('\n')))
                 else:
                     output_ = subprocess.check_output(
-                        ['dasgoclient','--query', f"file dataset={sample}"]
+                        ['ls',f"{input_base}/{sample}"]
                     )
                     sample_files = list(filter(lambda x: x != '', output_.decode('UTF-8').split('\n')))
 
                 time.sleep(1)
                 with open(os.path.join(jobs_dir, "inputfiles.dat"), 'w') as infiles:
                     for fn in sample_files:
-                        infiles.write(fn)
-                        infiles.write('\n')
+                        if '.root' in fn:
+                            infiles.write(f'{input_base}/{sample_name}/{fn}')
+                            infiles.write('\n')
+                        else:
+                            continue
                     infiles.close()
             time.sleep(2)
             eosoutdir =  eosbase.format(tag=options.tag,sample=sample_name)
@@ -230,7 +228,8 @@ def main():
                         ismc=options.isMC,
                         era=options.era,
                         eosdir=eosoutdir, 
-                        qawa_version=qawa_version
+                        qawa_version=qawa_version,
+                        dd = options.dd
                     )
                 else:
                     script = script_TEMPLATE_data.format(
@@ -238,7 +237,8 @@ def main():
                         ismc=options.isMC,
                         era=options.era,
                         eosdir=eosoutdir, 
-                        qawa_version=qawa_version
+                        qawa_version=qawa_version,
+                        dd = options.dd
                     )                    
                 scriptfile.write(script)
                 scriptfile.close()
@@ -246,8 +246,8 @@ def main():
             with open(os.path.join(jobs_dir, "condor.sub"), "w") as condorfile:
                 condor = condor_TEMPLATE.format(
                     transfer_file= ",".join([
-                        f"../brewer-remote.py",
-                        f"../dist/Qawa-{qawa_version}-py2.py3-none-any.whl",
+                        f"../../brewer-remote.py",
+                        f"../../dist/Qawa-{qawa_version}-py2.py3-none-any.whl",
                     ]),
                     jobdir=jobs_dir,
                     queue=options.queue
@@ -269,6 +269,17 @@ def main():
             htc.communicate()
             exit_status = htc.returncode
             logging.info("condor submission status : {}".format(exit_status))
-
+            if exit_status != 0:
+                os.system("rm -rf {}".format(jobs_dir))
+                if options.isMC:
+                    with open(f"./data/datasetUL{options.era}-mc-skim-tmpfail.txt", "a") as failfile:
+                        failfile.write(f'/{sample_name}')
+                        failfile.write('\n')
+                        failfile.close()
+                if not options.isMC:
+                    with open(f"./data/datasetUL{options.era}-data-skim-tmpfail.txt", "a") as failfile:
+                        failfile.write(f'/{sample_name}')
+                        failfile.write('\n')
+                        failfile.close()
 if __name__ == "__main__":
     main()
