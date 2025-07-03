@@ -1,0 +1,3 @@
+/ZZTo2E2Nu_TuneCP5_DipoleRecoil_13TeV_powheg_pythia8
+/ZZTo2Mu2Nu_TuneCP5_DipoleRecoil_13TeV_powheg_pythia8
+/VBS_QCD_Interference_RunIISummer20UL18wmLHEGEN
