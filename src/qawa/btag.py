@@ -19,9 +19,9 @@ def btag_id(wp:str='L', era:str='2018'):
     # using deepjet
     # ref : https://twiki.cern.ch/twiki/bin/view/CMS/BtagRecommendation
     dict_wp = {
-            "2016"   : {"L": 0.0480, "M": 0.2489, "T": 0.6377},
-            "2016APV": {"L": 0.0508, "M": 0.2598, "T": 0.6502},
-            "2017"   : {"L": 0.0532, "M": 0.3040, "T": 0.7476},
+            "2016"   : {"L": 0.0508, "M": 0.2489, "T": 0.6502},
+            "2016APV": {"L": 0.0480, "M": 0.2598, "T": 0.6377},
+            "2017"   : {"L": 0.0532, "M": 0.3033, "T": 0.7476},
             "2018"   : {"L": 0.0490, "M": 0.2783, "T": 0.7100}
     }
     return dict_wp[era][wp]
@@ -91,8 +91,8 @@ class BTVCorrector:
         return ak.fill_none(tagged_sf * untagged_sf, 1.)
 
     def append_btag_sf(self, jets: ak.Array, weights: Weights):
-        li_jets = jets[(jets.hadronFlavour==0) & (np.abs(jets.eta) <= 2.4)]
-        bc_jets = jets[(jets.hadronFlavour >0) & (np.abs(jets.eta) <= 2.4)]
+        li_jets = jets[(jets.hadronFlavour==0) & (np.abs(jets.eta) <= 2.4) & (jets.pt > 20)]
+        bc_jets = jets[(jets.hadronFlavour >0) & (np.abs(jets.eta) <= 2.4) & (jets.pt > 20)]
 
         wp_era_str = self._era + 'APV' if self.isAPV else self._era
         b_tagged_li = (li_jets.btagDeepFlavB  > btag_id(wp = self._wp, era=wp_era_str))
