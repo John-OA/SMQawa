@@ -13,104 +13,168 @@ class LeptonScaleFactors:
             self._era = era 
         extLepSF = extractor()
 
-        _data_path = os.path.join(os.path.dirname(__file__), 'data/lep')
+        _data_path = os.path.join(os.path.dirname(__file__), 'data/LeptonSF')
 
-        muonSelectionTag     = "LooseWP_" + self._era
+        muonSelectionTag     = "TightWP_" + self._era
         electronSelectionTag = "GPMVA90_" + self._era
 
-        if muonSelectionTag=="LooseWP_2016":
-            mu_f=["Efficiencies_muon_generalTracks_Z_Run2016_UL_SingleMuonTriggers.root",
-                  "Efficiencies_muon_generalTracks_Z_Run2016_UL_ID.root",
-                  "Efficiencies_muon_generalTracks_Z_Run2016_UL_ISO.root"]
-            mu_h = ["NUM_IsoMu24_or_IsoTkMu24_DEN_CutBasedIdTight_and_PFIsoTight_abseta_pt",
-                    "NUM_LooseID_DEN_TrackerMuons_abseta_pt",
-                    "NUM_LooseRelIso_DEN_LooseID_abseta_pt"]
-        elif muonSelectionTag=="LooseWP_2016APV":
-            mu_f=["Efficiencies_muon_generalTracks_Z_Run2016_UL_HIPM_SingleMuonTriggers.root",
-                  "Efficiencies_muon_generalTracks_Z_Run2016_UL_HIPM_ID.root",
-                  "Efficiencies_muon_generalTracks_Z_Run2016_UL_HIPM_ISO.root"]
-            mu_h = ["NUM_IsoMu24_or_IsoTkMu24_DEN_CutBasedIdTight_and_PFIsoTight_abseta_pt",
-                    "NUM_LooseID_DEN_TrackerMuons_abseta_pt",
-                    "NUM_LooseRelIso_DEN_LooseID_abseta_pt"]
-        elif muonSelectionTag=="LooseWP_2017":
-            mu_f=["Efficiencies_muon_generalTracks_Z_Run2017_UL_SingleMuonTriggers.root",
-                  "Efficiencies_muon_generalTracks_Z_Run2017_UL_ID.root",
-                  "Efficiencies_muon_generalTracks_Z_Run2017_UL_ISO.root"]
-            mu_h = ["NUM_IsoMu27_DEN_CutBasedIdTight_and_PFIsoTight_abseta_pt",
-                    "NUM_LooseID_DEN_TrackerMuons_abseta_pt",
-                    "NUM_LooseRelIso_DEN_LooseID_abseta_pt"]
-        elif muonSelectionTag=="LooseWP_2018":
-            mu_f=["Efficiencies_muon_generalTracks_Z_Run2018_UL_SingleMuonTriggers.root",
-                  "Efficiencies_muon_generalTracks_Z_Run2018_UL_ID.root",
-                  "Efficiencies_muon_generalTracks_Z_Run2018_UL_ISO.root"]
-            mu_h = ["NUM_IsoMu24_DEN_CutBasedIdTight_and_PFIsoTight_abseta_pt",
-                    "NUM_LooseID_DEN_TrackerMuons_abseta_pt",
-                    "NUM_LooseRelIso_DEN_LooseID_abseta_pt"]
+        if muonSelectionTag=="TightWP_2016":
+            mu_f=["2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_ID.root",
+                  "2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_ISO.root"]
+            mu_h = ["NUM_TightID_DEN_TrackerMuons_abseta_pt",
+                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt"]
+            mu_f_up = ["2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_ID_variations.root",
+                  "2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_ISO_variations.root"]
+            mu_h_up = ['NUM_LooseID_DEN_TrackerMuons_abseta_pt_up;1',
+                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt_up;1"]
+            mu_f_down = ["2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_ID_variations.root",
+                  "2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_ISO_variations.root"]
+            mu_h_down = ["NUM_LooseID_DEN_TrackerMuons_abseta_pt_down;1",
+                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt_down"]
+
+        elif muonSelectionTag=="TightWP_2016APV":
+            mu_f=["2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_HIPM_ID.root",
+                  "2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_HIPM_ISO.root"]
+            mu_h = ["NUM_TightID_DEN_TrackerMuons_abseta_pt",
+                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt"]
+            mu_f_up = ["2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_HIPM_ID_variations.root",
+                  "2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_HIPM_ISO_variations.root"]
+            mu_h_up = ['NUM_LooseID_DEN_TrackerMuons_abseta_pt_up;1',
+                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt_up;1"]
+            mu_f_down = ["2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_HIPM_ID_variations.root",
+                  "2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_HIPM_ISO_variations.root"]
+            mu_h_down = ["NUM_LooseID_DEN_TrackerMuons_abseta_pt_down;1",
+                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt_down"]
+        elif muonSelectionTag=="TightWP_2017":
+            mu_f=["2017/Efficiencies_muon_generalTracks_Z_Run2017_UL_ID.root",
+                  "2017/Efficiencies_muon_generalTracks_Z_Run2017_UL_ISO.root"]
+            mu_h = ["NUM_TightID_DEN_TrackerMuons_abseta_pt",
+                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt"]
+            mu_f_up = ["2017/Efficiencies_muon_generalTracks_Z_Run2017_UL_ID_variations.root",
+                  "2017/Efficiencies_muon_generalTracks_Z_Run2017_UL_ISO_variations.root"]
+            mu_h_up = ['NUM_LooseID_DEN_TrackerMuons_abseta_pt_up;1',
+                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt_up;1"]
+            mu_f_down = ["2017/Efficiencies_muon_generalTracks_Z_Run2017_UL_ID_variations.root",
+                  "2017/Efficiencies_muon_generalTracks_Z_Run2017_UL_ISO_variations.root"]
+            mu_h_down = ["NUM_LooseID_DEN_TrackerMuons_abseta_pt_down;1",
+                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt_down"]
+        elif muonSelectionTag=="TightWP_2018":
+            mu_f=["2018/Efficiencies_muon_generalTracks_Z_Run2018_UL_ID.root",
+                  "2018/Efficiencies_muon_generalTracks_Z_Run2018_UL_ISO.root"]
+            mu_h = ["NUM_TightID_DEN_TrackerMuons_abseta_pt",
+                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt"]
+            mu_f_up = ["2018/Efficiencies_muon_generalTracks_Z_Run2018_UL_ID_variations.root",
+                  "2018/Efficiencies_muon_generalTracks_Z_Run2018_UL_ISO_variations.root"]
+            mu_h_up = ['NUM_LooseID_DEN_TrackerMuons_abseta_pt_up;1',
+                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt_up;1"]
+            mu_f_down = ["2018/Efficiencies_muon_generalTracks_Z_Run2018_UL_ID_variations.root",
+                  "2018/Efficiencies_muon_generalTracks_Z_Run2018_UL_ISO_variations.root"]
+            mu_h_down = ["NUM_LooseID_DEN_TrackerMuons_abseta_pt_down;1",
+                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt_down"]
         else:
             print (f'wrong era: {muonSelectionTag}')
 
 
         if electronSelectionTag=="GPMVA90_2016":
-            el_f = ["egammaEffi_txt_Ele_wp90iso_postVFP_EGM2D.root",
-                    "electron_RecoSF_UL2016.root"]
-            el_h = ["EGamma_SF2D",
-                    "EGamma_SF2D"]
-        if electronSelectionTag=="GPMVA90_2016APV":
-            el_f = ["egammaEffi_txt_Ele_wp90iso_preVFP_EGM2D.root",
-                    "electron_RecoSF_UL2016APV.root"]
-            el_h = ["EGamma_SF2D",
-                    "EGamma_SF2D"]
+            el_f = ["2016/egammaEffi.txt_Ele_wp90iso_postVFP_EGM2D.root",
+                    "2016/electron_RecoSF_UL2016postVFP.root"]
+            el_h = ["EGamma_SF2D","EGamma_SF2D"]
+            el_f_up = ["2016/egammaEffi.txt_Ele_wp90iso_postVFP_EGM2D_variations.root",
+                    "2016/electron_RecoSF_UL2016postVFP.root"]
+            el_h_up = ["EGamma_SF2D_up","EGamma_SF2D"]
+            el_f_down = ["2016/egammaEffi.txt_Ele_wp90iso_postVFP_EGM2D_variations.root",
+                    "2016/electron_RecoSF_UL2016postVFP.root"]
+            el_h_down = ["EGamma_SF2D_down","EGamma_SF2D"]
+        elif electronSelectionTag=="GPMVA90_2016APV":
+            el_f = ["2016/egammaEffi.txt_Ele_wp90iso_preVFP_EGM2D.root",
+                    "2016/electron_RecoSF_UL2016preVFP.root"]
+            el_h = ["EGamma_SF2D","EGamma_SF2D"]
+            el_f_up = ["2016/egammaEffi.txt_Ele_wp90iso_preVFP_EGM2D_variations.root",
+                    "2016/electron_RecoSF_UL2016preVFP.root"]
+            el_h_up = ["EGamma_SF2D_up","EGamma_SF2D"]
+            el_f_down = ["2016/egammaEffi.txt_Ele_wp90iso_preVFP_EGM2D_variations.root",
+                    "2016/electron_RecoSF_UL2016preVFP.root"]
+            el_h_down = ["EGamma_SF2D_down","EGamma_SF2D"]
         elif electronSelectionTag=="GPMVA90_2017":
-            el_f = ["egammaEffi_txt_EGM2D_MVA90iso_UL17.root",
-                    "electron_RecoSF_UL2017.root"]
-            el_h = ["EGamma_SF2D",
-                    "EGamma_SF2D"]
+            el_f = ["2017/egammaEffi.txt_EGM2D_MVA90iso_UL17.root",
+                    "2017/electron_RecoSF_UL2017.root"]
+            el_h = ["EGamma_SF2D","EGamma_SF2D"]
+            el_f_up = ["2017/egammaEffi.txt_EGM2D_MVA90iso_UL17_variations.root",
+                    "2017/electron_RecoSF_UL2017.root"]
+            el_h_up = ["EGamma_SF2D_up","EGamma_SF2D"]
+            el_f_down = ["2017/egammaEffi.txt_EGM2D_MVA90iso_UL17_variations.root",
+                    "2017/electron_RecoSF_UL2017.root"]
+            el_h_down = ["EGamma_SF2D_down","EGamma_SF2D"]
         elif electronSelectionTag=="GPMVA90_2018":
-            el_f = ["egammaEffi_txt_Ele_wp90iso_EGM2D.root",
-                    "electron_RecoSF_UL2018.root"]
-            el_h = ["EGamma_SF2D",
-                    "EGamma_SF2D"]
+            el_f = ["2018/egammaEffi.txt_Ele_wp90iso_EGM2D.root",
+                    "2018/electron_RecoSF_UL2018.root"]
+            el_h = ["EGamma_SF2D","EGamma_SF2D"]
+            el_f_up = ["2018/egammaEffi.txt_Ele_wp90iso_EGM2D_variations.root",
+                    "2018/electron_RecoSF_UL2018.root"]
+            el_h_up = ["EGamma_SF2D_up","EGamma_SF2D"]
+            el_f_down = ["2018/egammaEffi.txt_Ele_wp90iso_EGM2D_variations.root",
+                    "2018/electron_RecoSF_UL2018.root"]
+            el_h_down = ["EGamma_SF2D_down","EGamma_SF2D"]
         else:
             print (f'wrong era: {electronSelectionTag}')
-            
+
         self.maps_nom = {}
-        self.maps_err = {}
+        self.maps_up = {}
+        self.maps_down = {}
         for i, _fname in enumerate(mu_f):
             with uproot.open(f"{_data_path}/{_fname}") as _fn:
                 _hist = _fn[mu_h[i]].to_hist()
                 _hnom = _hist.values()
-                _herr = np.sqrt(_hist.variances())
-                tag = f"MuonTri{era}" if "Trigger" in _fname else ""
-                tag = f"MuonIso{era}" if "ISO" in _fname else tag
+                tag = f"MuonIso{era}" if "ISO" in _fname else ""
                 tag = f"MuonId{era}"  if "ID" in _fname else tag
-                
                 self.maps_nom[tag] = dense_lookup.dense_lookup(_hnom,[ax.edges for ax in _hist.axes])
-                self.maps_err[tag] = dense_lookup.dense_lookup(_herr,[ax.edges for ax in _hist.axes])
+            with uproot.open(f"{_data_path}/{mu_f_up[i]}") as _fn:
+                _hist = _fn[mu_h_up[i]].to_hist()
+                _herr_up = _hist.values()
+                tag = f"MuonIso{era}" if "ISO" in _fname else ""
+                tag = f"MuonId{era}"  if "ID" in _fname else tag
+                self.maps_up[tag] = dense_lookup.dense_lookup(_herr_up,[ax.edges for ax in _hist.axes])
+            with uproot.open(f"{_data_path}/{mu_f_down[i]}") as _fn:
+                _hist = _fn[mu_h_down[i]].to_hist()
+                _herr_down = _hist.values()
+                tag = f"MuonIso{era}" if "ISO" in _fname else ""
+                tag = f"MuonId{era}"  if "ID" in _fname else tag
+                self.maps_down[tag] = dense_lookup.dense_lookup(_herr_down,[ax.edges for ax in _hist.axes])
 
         for i, _fname in enumerate(el_f):
             with uproot.open(f"{_data_path}/{_fname}") as _fn:
                 _hist = _fn[el_h[i]].to_hist()
                 _hnom = _hist.values()
-                _herr = np.sqrt(_hist.variances())
-                tag = f"ElectronSF{era}" if "Ele" in _fname else ""
-                tag = f"ElectronRecoSF{era}" if "Reco" in _fname else ""
-                
+                tag = f"ElectronIso{era}" if "iso" in _fname else ""
+                tag = f"ElectronReco{era}" if "Reco" in _fname else tag
                 self.maps_nom[tag] = dense_lookup.dense_lookup(_hnom,[ax.edges for ax in _hist.axes])
-                self.maps_err[tag] = dense_lookup.dense_lookup(_herr,[ax.edges for ax in _hist.axes])
+            with uproot.open(f"{_data_path}/{el_f_up[i]}") as _fn:
+                _hist = _fn[el_h_up[i]].to_hist()
+                _herr_up = _hist.values()
+                tag = f"ElectronIso{era}" if "iso" in _fname else ""
+                tag = f"ElectronReco{era}" if "Reco" in _fname else tag
+                self.maps_up[tag] = dense_lookup.dense_lookup(_herr_up,[ax.edges for ax in _hist.axes])
+            with uproot.open(f"{_data_path}/{el_f_down[i]}") as _fn:
+                _hist = _fn[el_h_down[i]].to_hist()
+                _herr_down = _hist.values()
+                tag = f"ElectronIso{era}" if "iso" in _fname else ""
+                tag = f"ElectronReco{era}" if "Reco" in _fname else tag
+                self.maps_down[tag] = dense_lookup.dense_lookup(_herr_down,[ax.edges for ax in _hist.axes])
 
 
     def muonSF(self, muons: ak.Array):
         sf_nom  = 1.0 # ak.ones_like(muons.pt)
         sf_up   = 1.0 # ak.ones_like(muons.pt)
         sf_down = 1.0 # ak.ones_like(muons.pt)
-        
+
         for n in self.maps_nom.keys():
             if 'Muon' not in n: continue
             _nom = self.maps_nom[n](muons.pt, np.abs(muons.eta))
-            _err = self.maps_err[n](muons.pt, np.abs(muons.eta))
+            _up = self.maps_up[n](muons.pt, np.abs(muons.eta))
+            _down = self.maps_down[n](muons.pt, np.abs(muons.eta))
             sf_nom = sf_nom * _nom 
-            sf_up = sf_up * (_nom + _err)
-            sf_down = sf_down * (_nom - _err)
+            sf_up = sf_up * _up
+            sf_down = sf_down * _down
             
         return sf_nom, sf_up, sf_down
 
@@ -122,20 +186,10 @@ class LeptonScaleFactors:
         for n in self.maps_nom.keys():
             if 'Electron' not in n: continue
             _nom = self.maps_nom[n](electrons.pt, np.abs(electrons.eta))
-            _err = self.maps_err[n](electrons.pt, np.abs(electrons.eta))
+            _up = self.maps_up[n](electrons.pt, np.abs(electrons.eta))
+            _down = self.maps_down[n](electrons.pt, np.abs(electrons.eta))
             sf_nom = sf_nom * _nom 
-            sf_up = sf_up * (_nom + _err)
-            sf_down = sf_down * (_nom - _err)
+            sf_up = sf_up * _up
+            sf_down = sf_down * _down
             
         return sf_nom, sf_up, sf_down
-
-
-
-
-
-
-
-
-
-
-
