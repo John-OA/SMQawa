@@ -5,26 +5,6 @@ Run2016.DoubleMuon:
         - Mu17_TrkIsoVVL_Mu8_TrkIsoVVL_DZ
         - Mu17_TrkIsoVVL_TkMu8_TrkIsoVVL_DZ
     veto: []
-Run2016.DoubleEG:
-    pass:
-        - Ele23_Ele12_CaloIdL_TrackIdL_IsoVL_DZ
-    veto:
-        - Mu17_TrkIsoVVL_Mu8_TrkIsoVVL
-        - Mu17_TrkIsoVVL_TkMu8_TrkIsoVVL
-        - Mu17_TrkIsoVVL_Mu8_TrkIsoVVL_DZ
-        - Mu17_TrkIsoVVL_TkMu8_TrkIsoVVL_DZ
-Run2016.MuonEG:
-    pass:
-        - Mu17_TrkIsoVVL_Ele12_CaloIdL_TrackIdL_IsoVL
-        - Mu23_TrkIsoVVL_Ele12_CaloIdL_TrackIdL_IsoVL
-        - Mu8_TrkIsoVVL_Ele17_CaloIdL_TrackIdL_IsoVL
-        - Mu8_TrkIsoVVL_Ele23_CaloIdL_TrackIdL_IsoVL
-    veto:
-        - Mu17_TrkIsoVVL_Mu8_TrkIsoVVL
-        - Mu17_TrkIsoVVL_TkMu8_TrkIsoVVL
-        - Mu17_TrkIsoVVL_Mu8_TrkIsoVVL_DZ
-        - Mu17_TrkIsoVVL_TkMu8_TrkIsoVVL_DZ
-        - Ele23_Ele12_CaloIdL_TrackIdL_IsoVL_DZ
 Run2016.SingleMuon:
     pass:
         - IsoMu20
@@ -33,16 +13,32 @@ Run2016.SingleMuon:
         - IsoTkMu22
         - IsoMu24
         - IsoTkMu24
+        - Mu50
+        - TkMu50
     veto:
         - Mu17_TrkIsoVVL_Mu8_TrkIsoVVL
         - Mu17_TrkIsoVVL_TkMu8_TrkIsoVVL
         - Mu17_TrkIsoVVL_Mu8_TrkIsoVVL_DZ
         - Mu17_TrkIsoVVL_TkMu8_TrkIsoVVL_DZ
+Run2016.DoubleEG:
+    pass:
         - Ele23_Ele12_CaloIdL_TrackIdL_IsoVL_DZ
-        - Mu17_TrkIsoVVL_Ele12_CaloIdL_TrackIdL_IsoVL
-        - Mu23_TrkIsoVVL_Ele12_CaloIdL_TrackIdL_IsoVL
-        - Mu8_TrkIsoVVL_Ele17_CaloIdL_TrackIdL_IsoVL
-        - Mu8_TrkIsoVVL_Ele23_CaloIdL_TrackIdL_IsoVL
+        - DoubleEle33_CaloIdL_GsfTrkIdVL
+        - DoubleEle33_CaloIdL_MW
+        - DoublePhoton60
+    veto:
+        - Mu17_TrkIsoVVL_Mu8_TrkIsoVVL
+        - Mu17_TrkIsoVVL_TkMu8_TrkIsoVVL
+        - Mu17_TrkIsoVVL_Mu8_TrkIsoVVL_DZ
+        - Mu17_TrkIsoVVL_TkMu8_TrkIsoVVL_DZ
+        - IsoMu20
+        - IsoTkMu20
+        - IsoMu22
+        - IsoTkMu22
+        - IsoMu24
+        - IsoTkMu24
+        - Mu50
+        - TkMu50
 Run2016.SingleElectron:
     pass:
         - Ele25_eta2p1_WPTight_Gsf
@@ -50,18 +46,49 @@ Run2016.SingleElectron:
         - Ele27_WPTight_Gsf
         - Ele35_WPLoose_Gsf
     veto:
+        - Ele23_Ele12_CaloIdL_TrackIdL_IsoVL_DZ
+        - DoubleEle33_CaloIdL_GsfTrkIdVL
+        - DoubleEle33_CaloIdL_MW
+        - DoublePhoton60
         - Mu17_TrkIsoVVL_Mu8_TrkIsoVVL
         - Mu17_TrkIsoVVL_TkMu8_TrkIsoVVL
         - Mu17_TrkIsoVVL_Mu8_TrkIsoVVL_DZ
         - Mu17_TrkIsoVVL_TkMu8_TrkIsoVVL_DZ
-        - Ele23_Ele12_CaloIdL_TrackIdL_IsoVL_DZ
-        - Mu17_TrkIsoVVL_Ele12_CaloIdL_TrackIdL_IsoVL
-        - Mu23_TrkIsoVVL_Ele12_CaloIdL_TrackIdL_IsoVL
-        - Mu8_TrkIsoVVL_Ele17_CaloIdL_TrackIdL_IsoVL
-        - Mu8_TrkIsoVVL_Ele23_CaloIdL_TrackIdL_IsoVL
         - IsoMu20
         - IsoTkMu20
         - IsoMu22
         - IsoTkMu22
         - IsoMu24
         - IsoTkMu24
+        - Mu50
+        - TkMu50
+Run2016.MuonEG:
+    pass:
+        - Mu17_TrkIsoVVL_Ele12_CaloIdL_TrackIdL_IsoVL
+        - Mu23_TrkIsoVVL_Ele12_CaloIdL_TrackIdL_IsoVL
+        - Mu8_TrkIsoVVL_Ele17_CaloIdL_TrackIdL_IsoVL
+        - Mu8_TrkIsoVVL_Ele23_CaloIdL_TrackIdL_IsoVL
+        - Mu8_TrkIsoVVL_Ele23_CaloIdL_TrackIdL_IsoVL_DZ
+        - Mu23_TrkIsoVVL_Ele8_CaloIdL_TrackIdL_IsoVL
+        - Mu23_TrkIsoVVL_Ele8_CaloIdL_TrackIdL_IsoVL_DZ
+    veto:
+        - Ele25_eta2p1_WPTight_Gsf
+        - Ele27_eta2p1_WPLoose_Gsf
+        - Ele27_WPTight_Gsf
+        - Ele35_WPLoose_Gsf
+        - Ele23_Ele12_CaloIdL_TrackIdL_IsoVL_DZ
+        - DoubleEle33_CaloIdL_GsfTrkIdVL
+        - DoubleEle33_CaloIdL_MW
+        - DoublePhoton60
+        - Mu17_TrkIsoVVL_Mu8_TrkIsoVVL
+        - Mu17_TrkIsoVVL_TkMu8_TrkIsoVVL
+        - Mu17_TrkIsoVVL_Mu8_TrkIsoVVL_DZ
+        - Mu17_TrkIsoVVL_TkMu8_TrkIsoVVL_DZ
+        - IsoMu20
+        - IsoTkMu20
+        - IsoMu22
+        - IsoTkMu22
+        - IsoMu24
+        - IsoTkMu24
+        - Mu50
+        - TkMu50
