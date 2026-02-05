@@ -339,7 +339,7 @@ class wzinclusive_processor(processor.ProcessorABC):
             'taus_phi': hist.Hist(
                 hist.axis.StrCategory([], name="channel"   , growth=True),
                 hist.axis.StrCategory([], name="systematic", growth=True), 
-                hist.axis.Regular(50, -3.2, 3,2, name="taus_phi", label=r"$\phi(\tau)$"),
+                hist.axis.Regular(50, -3.2, 3.2, name="taus_phi", label=r"$\phi(\tau)$"),
                 hist.storage.Weight()
             ),
             'tau_pt_loose': hist.Hist(
