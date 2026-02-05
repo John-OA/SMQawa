@@ -9,11 +9,11 @@ The shell executable sets up environment variables and sources the singularity i
 The profiles implicitly create the python virtual environment when none is already present (`.env`), then install coffea and SMQawa in editable mode, and otherwise source the environment if `.env` exists (so for reinstallation of code, you may need to delete the `.env` to trigger a reinstall via the profile).
 
 ```bash
-export INSTALL_LOC_EXTERNAL=$PWD/WZAnalysis
+export INSTALL_LOC_EXTERNAL=$PWD/VZAnalysis
 mkdir -p $INSTALL_LOC_EXTERNAL
 cd $INSTALL_LOC_EXTERNAL
-git clone -b <branch_name> git@github.com:<githubusername>/DCTools.git
-git clone -b <branch_name> git@github.com:<githubusername>/SMQawa.git
+git clone -b VZ_main git@github.com:<githubusername>/DCTools.git
+git clone -b VZ_main git@github.com:<githubusername>/SMQawa.git
 zsh SMQawa/bootstrap.zsh <shell> <location>
 ```
 

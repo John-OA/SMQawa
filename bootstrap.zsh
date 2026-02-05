@@ -118,7 +118,7 @@ install_env() {
   if [ ! -d "DCTools" ]; then
     echo "DCTools should be cloned into the directory adjacent to SMQawa to enable combine card building and postfit plotting"
     echo "e.g. git clone -b main git@github.com:yhaddad/DCTools.git for main branch"
-    echo "For current development branch, git clone -b fix-lumi-uncertainties git@github.com:NJManganelli/DCTools.git"
+    echo "For current development branch, git clone -b VZ_main git@github.com:NJManganelli/DCTools.git"
   fi
   echo "done."
 }
@@ -203,7 +203,7 @@ install_env() {
   if [ ! -d "DCTools" ]; then
     echo "DCTools should be cloned into the directory adjacent to SMQawa to enable combine card building and postfit plotting"
     echo "e.g. git clone -b main git@github.com:yhaddad/DCTools.git for main branch"
-    echo "For current development branch, git clone -b fix-lumi-uncertainties git@github.com:NJManganelli/DCTools.git"
+    echo "For current development branch, git clone -b VZ_main git@github.com:NJManganelli/DCTools.git"
   fi
   echo "done."
 }
