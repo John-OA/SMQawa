@@ -59,7 +59,7 @@ def main():
     parser.add_argument('--jobNum' ,   type=int, default=1     , help="")
     parser.add_argument('--era'    ,   type=str, default="2018", help="")
     parser.add_argument('--isMC'   ,   type=int, default=1     , help="")
-    parser.add_argument('--infile' ,   type=str, default=None  , help="input root file")
+    parser.add_argument('--infile' ,   type=str, default=None  , help=input root file)
     parser.add_argument('--dataset',   type=str, default=None  , help="dataset name. need to specify if file is not in EOS")
     parser.add_argument('--runperiod', type=str, default=None)
     parser.add_argument('--executor' , type=str, default="FuturesExecutor", help="Executor to use, one of IterativeExecutor (good for debugging), FuturesExecutor (multithreaded), or other coffea option")
