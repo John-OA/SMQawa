@@ -154,25 +154,34 @@ def main():
             else:
                 file_name = options.infile 
 
-            samples ={
+            metadata = {
+                'era': era,
+                'is_data': is_data
+            }
+            runs_files = {local_file_name: "Runs" if local_file_name else file_name}
+            runs_samples ={
                 options.dataset:{
-                    'files': [local_file_name if local_file_name else file_name],
-                    'metadata':{
-                        'era': era,
-                        'is_data': is_data
-                    }
+                    'files': runs_files,
+                    'metadata': metadata
                 }
             }
-            print(f"brewer-remote-inclusive.py running with the following samples definition:\n{samples}")
+            events_files = {fn: "Events" for fn in runs_files.keys()}
+            events_samples ={
+                options.dataset:{
+                    'files': events_files,
+                    'metadata': metadata
+                }
+            }
             sumw_runner = processor.Runner(
                 executor=executor,
                 schema=BaseSchema,
                 format="root",
+                savemetrics=True,
             )
-            sumw_out = sumw_runner(samples,
-                                   "Runs",
-                                   processor_instance=coffea_sumw(),
-                                   )
+            sumw_out, sumw_metrics = sumw_runner(
+                runs_samples,
+                processor_instance=coffea_sumw(),
+            )
             
             ewk_flag = None
             if "ZZTo" in options.infile and "GluGluTo" not in options.infile and "ZZJJ" not in options.infile:
@@ -228,19 +237,20 @@ def main():
                 raise NotImplementedError(f"{options.analysis} does not have hooks for loading a processor, please update the code to point appropriately to it, along with any necessary init configuration options.")
 
             # print(" --- wztau2lnu_inclusive processor ... ")
-            vbs_runner = processor.Runner(
+            events_runner = processor.Runner(
                 executor=executor,
                 schema=NanoAODSchema,
                 chunksize=100000,
-                # maxchunks=5
+                # maxchunks=5,
                 format="root",
+                savemetrics=True
             )
-            vbs_out = vbs_runner(samples,
-                                 "Events",
-                                 processor_instance=proc_configured,
-                                 )
+            events_out, event_metrics = events_runner(
+                events_samples,
+                processor_instance=proc_configured,
+            )
             bh_output = {}
-            for key, content in vbs_out.items():
+            for key, content in events_out.items():
                 bh_output[key] = {
                     "hist": content,
                     "sumw": sumw_out[key],
