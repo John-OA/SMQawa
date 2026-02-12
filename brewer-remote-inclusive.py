@@ -1,6 +1,7 @@
 from coffea import processor
 from coffea import nanoevents
 from coffea.nanoevents import NanoAODSchema, BaseSchema
+from coffea.util import coffea_console
 from qawa.process.coffea_sumw import coffea_sumw
 import argparse
 import pickle
@@ -42,11 +43,11 @@ def validate_input_file(nanofile):
             pass
         if testfile:
             nanofile=alias + pfn
-            print(f'--> {alias} OK')
+            coffea_console.print(f'--> {alias} OK')
             valid = True
             break
         else:
-            print(f'--> {alias} FAILED')
+            coffea_console.print(f'--> {alias} FAILED')
 
         if valid==False:
             # all faild force AAA anyways
@@ -64,6 +65,7 @@ def main():
     parser.add_argument('--runperiod', type=str, default=None)
     parser.add_argument('--executor' , type=str, default="FuturesExecutor", help="Executor to use, one of IterativeExecutor (good for debugging), FuturesExecutor (multithreaded), or other coffea option")
     parser.add_argument('--copyInput', action='store_true'     , help="xrdcp a file to the worker node before executing the coffea processor on it")
+    parser.add_argument('--maxChunks', '--maxchunks', type=int, default= -1, help="limit number of chunks per-file to this number at most, default '-1' to process all")
 
     options = parser.parse_args()
     split_args = options.infile.split('/')
@@ -83,8 +85,8 @@ def main():
             auto_dataset = split_args[tier_index - 1]
             auto_runperiod = split_args[tier_index - 2].replace(f"Run{options.era}", "")
         except ValueError as ve:
-            print("couldn't auto-parse dataset and runperiod from filename:)")
-            print(ve)
+            coffea_console.print("couldn't auto-parse dataset and runperiod from filename:)")
+            coffea_console.print(ve)
 
 
     if options.dataset is None:
@@ -133,21 +135,21 @@ def main():
                         deepest_name = local_file_name.split("/")[-1]
                         local_file_nested_dir = local_file_name.replace(deepest_name, "")
                         if not os.path.isdir(local_file_nested_dir):
-                            print(f"making directory... {local_file_nested_dir}")
+                            coffea_console.print(f"making directory... {local_file_nested_dir}")
                             os.makedirs(local_file_nested_dir, exist_ok=True)
                         if not os.path.isfile(local_file_name):
-                            print(f"xrdcp file {file_name} {local_file_name}")
+                            coffea_console.print(f"xrdcp file {file_name} {local_file_name}")
                             os.system(f"xrdcp {file_name} {local_file_name}")
                         if not os.path.isfile(local_file_name):
                             raise RuntimeError(f"Failed to download the file locally for processing: {file_name} -> {local_file_name}")
                     except Exception as le:
                         local_file_name = None
-                        print(le)
+                        coffea_console.print(le)
                 else:
                     if local_file_name:
-                        print(f"File loaded to local directory: {local_file_name} (existence-test: {os.path.isfile(local_file_name)}")
+                        coffea_console.print(f"File loaded to local directory: {local_file_name} (existence-test: {os.path.isfile(local_file_name)}")
                     else:
-                        print(f"local_file_name not set ({local_file_name}), probably due to file_name ({file_name}) not indicating an xrdcp-able path by starting with root://")
+                        coffea_console.print(f"local_file_name not set ({local_file_name}), probably due to file_name ({file_name}) not indicating an xrdcp-able path by starting with root://")
 
 
                 file_name = aliases[ixrd] + options.infile
@@ -197,23 +199,31 @@ def main():
             else:
                 options.runperiod = ''
 
-            print(
+            coffea_console.print(
                 f"""---------------------------
                 -- options   = {options}
                 -- analysis  = {options.analysis}
-                -- is MC     = {options.isMC}
+                -- isMC      = {options.isMC}
                 -- jobNum    = {options.jobNum}
                 -- era       = {options.era}
-                -- in file   = {aliases[ixrd] + options.infile}
+                -- infile    = {options.infile}
+                --> {list(events_files.keys())[0]}
                 -- dataset   = {options.dataset}
                 -- period    = {options.runperiod}
                 -- executor  = {options.executor}
                 -- copyInput = {options.copyInput}
+                -- maxChunks = {options.maxChunks if options.maxChunks > 0 else "None"}
+
                 ---------------------------"""
             )
+            if options.maxChunks > 0:
+                coffea_console.print("WARNING: maxChunks will limit processing of MC or data, "
+                      "for MC the normalization will not be stored for the number of events processed and the scaling will be incorrect, ",
+                      "for data there will similarly not be an appropriate scaling of MC to match the processed luminosity in data."
+                      )
             if options.analysis in ["inc-WZ"]:
                 from qawa.process.wztau2lnu_inclusive import wzinclusive_processor
-                print(" --- wztau2lnu_inclusive main code processor ... ")
+                coffea_console.print(" --- wztau2lnu_inclusive main code processor ... ")
                 proc_configured = wzinclusive_processor(
                     era=options.era,
                     ewk_process_name=ewk_flag,
@@ -221,14 +231,14 @@ def main():
                 )
             elif options.analysis in ["inc-WZ-Fxsec"]:
                 from qawa.process.Fxsec import wzinclusive_processor # Fiducial XSec test processor for inc-WZ
-                print(" --- wztau2lnu_inclusive FV Xsec processor ... ")
+                coffea_console.print(" --- wztau2lnu_inclusive FV Xsec processor ... ")
                 proc_configured = wzinclusive_processor(
                     era=options.era,
                     ewk_process_name=ewk_flag,
                     run_period=options.runperiod if is_data else ''
                 )
             elif options.analysis in ["trig-eff"]:
-                print(" --- wztau2lnu_inclusive trigger efficiency processor ... ")
+                coffea_console.print(" --- wztau2lnu_inclusive trigger efficiency processor ... ")
                 from qawa.process.trig_eff import trig_processor
                 proc_configured = trig_processor(
                     isMC=options.isMC,
@@ -236,12 +246,12 @@ def main():
             else:
                 raise NotImplementedError(f"{options.analysis} does not have hooks for loading a processor, please update the code to point appropriately to it, along with any necessary init configuration options.")
 
-            # print(" --- wztau2lnu_inclusive processor ... ")
+            # coffea_console.print(" --- wztau2lnu_inclusive processor ... ")
             events_runner = processor.Runner(
                 executor=executor,
                 schema=NanoAODSchema,
                 chunksize=100000,
-                # maxchunks=5,
+                maxchunks = options.maxChunks if options.maxChunks > 0 else None,
                 format="root",
                 savemetrics=True
             )
@@ -259,14 +269,14 @@ def main():
                 pickle.dump(bh_output, f)
             failed=False
         except Exception as err:
-            print(f"[WARNING] {aliases[ixrd]} failed with the following error : ")
-            print(f"Unexpected {err=}, {type(err)=}")
-            print("printing Exception err:")
-            print(err)
+            coffea_console.print(f"[WARNING] {aliases[ixrd]} failed with the following error : ")
+            coffea_console.print(f"Unexpected {err=}, {type(err)=}")
+            coffea_console.print("printing Exception err:")
+            coffea_console.print(err)
             # print(traceback.format_exc())
-            print("printing traceback.print_exc():")
+            coffea_console.print("printing traceback.print_exc():")
             traceback.print_exc()
-            print("-------------------------------------------")
+            coffea_console.print("-------------------------------------------")
             failed=True
             ixrd += 1
             if ixrd > (len(aliases) - 1):

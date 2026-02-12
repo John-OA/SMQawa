@@ -21,6 +21,7 @@ from coffea import processor
 from coffea.nanoevents.methods import candidate
 from coffea.analysis_tools import Weights, PackedSelection
 from coffea.lumi_tools import LumiMask
+from coffea.util import coffea_console
 from qawa.roccor import rochester_correction
 from qawa.leptonsSF import LeptonScaleFactors
 from qawa.jetPU import jetPUScaleFactors
@@ -74,8 +75,8 @@ def build_leptons(muons, electrons):
     return tight_leptons, loose_leptons
 
 def build_htaus(tau, lepton):
-    #print(dir(tau))
-    #print(tau.__dict__)
+    #coffea_console.print(dir(tau))
+    #coffea_console.print(tau.__dict__)
     
     base_selection = (
         (tau.pt         > 20 ) & 
@@ -96,8 +97,6 @@ def build_htaus(tau, lepton):
     return tau[base_selection & ~overlap_leptons]
 
 def build_htaus_tight(tau, lepton):
-    #print(dir(tau))
-    #print(tau.__dict__)
     
     base_selection = (
         (tau.pt         > 20 ) & 
@@ -118,8 +117,6 @@ def build_htaus_tight(tau, lepton):
     return tau[base_selection & ~overlap_leptons]
 
 def build_htaus_loose(tau, lepton):
-    #print(dir(tau))
-    #print(tau.__dict__)
     
     base_selection = (
         (tau.pt         > 20 ) & 
@@ -206,7 +203,6 @@ class wzinclusive_processor(processor.ProcessorABC):
         if 'APV' in self._era:
             self._isAPV = True
             self._era = re.findall(r'\d+', self._era)[0] 
-            #print(f"[YACINE DEBUG] era={self._era} APV={self._isAPV}")
         else:
             self._isAPV = False
 
@@ -1028,7 +1024,7 @@ class wzinclusive_processor(processor.ProcessorABC):
                     weights.add('QCDScale1w'  , _ones, event.LHEScaleWeight[:, 6], event.LHEScaleWeight[:, 10])
                     weights.add('QCDScale2w'  , _ones, event.LHEScaleWeight[:, 0], event.LHEScaleWeight[:, 16])
                 else:
-                    print("WARNING: QCD scale variation type not recongnised ... ")
+                    coffea_console.print("WARNING: QCD scale variation type not recongnised ... ")
                 
             if 'LHEReweightingWeight' in event.fields and 'aQGC' in dataset:
                 for i in range(1057):
@@ -1106,18 +1102,18 @@ class wzinclusive_processor(processor.ProcessorABC):
             if cut is None:
                 vv = ak.to_numpy(ak.fill_none(variable, np.nan))
                 if np.isnan(np.any(vv)):
-                    print(" - vv with nan:", vv)
+                    coffea_console.print(" - vv with nan:", vv)
                 return ak.to_numpy(ak.fill_none(variable, np.nan))
             else:
                 vv = ak.to_numpy(ak.fill_none(variable[cut], np.nan))
                 if np.isnan(np.any(vv)):
-                    print(" - vv with nan:", vv)
+                    coffea_console.print(" - vv with nan:", vv)
                 return ak.to_numpy(ak.fill_none(variable[cut], np.nan))
 
         def collection_printer(collection):
             longest_field = max([len(field) for field in collection.fields])
             for field in collection.fields:
-                print(f"\t{field:<{longest_field}}={getattr(collection, field)}")
+                coffea_console.print(f"\t{field:<{longest_field}}={getattr(collection, field)}")
         
         def _histogram_filler(ch, syst, var, _weight=None):
             sel_ = channels[ch]
@@ -1138,12 +1134,12 @@ class wzinclusive_processor(processor.ProcessorABC):
             
             vv = ak.to_numpy(ak.fill_none(weight, np.nan))
             if np.isnan(np.any(vv)):
-                print(f" - {syst} weight contains invalid values:", vv[np.isnan(vv)], vv[np.isinf(vv)])
+                coffea_console.print(f" - {syst} weight contains invalid values:", vv[np.isnan(vv)], vv[np.isinf(vv)])
 
             # if ch in ['inc-SR1', 'inc-DY1']:
             #     if var in ["met_pt", "mT_WZ", "lead_jet_pt", "dilep_loose_tau_pt", "dilep_loose_tau_met_dphi", "met_phi", "lead_jet_phi", "dilep_loose_tau_phi"] :
             #         if systname in ['nominal', 'JESUp', 'JESDown']:
-            #             print(ch, var, systname, _format_variable(event[var], cut)[:2], event.event[cut][:2])
+            #             coffea_console.print(ch, var, systname, _format_variable(event[var], cut)[:2], event.event[cut][:2])
             #             if ch=='inc-SR1' and var=="mT_WZ" :
             #                 collection_printer(event.Tau[:2])
 
@@ -1176,7 +1172,7 @@ class wzinclusive_processor(processor.ProcessorABC):
             
             vv = ak.to_numpy(ak.fill_none(weight, np.nan))
             if np.isnan(np.any(vv)):
-                print(f" - {syst} weight contains invalid values:", vv[np.isnan(vv)], vv[np.isinf(vv)])
+                coffea_console.print(f" - {syst} weight contains invalid values:", vv[np.isnan(vv)], vv[np.isinf(vv)])
 
             histos[var1+"_2D_"+var2].fill(
                 **{
