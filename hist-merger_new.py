@@ -32,6 +32,7 @@ def merger():
     parser = argparse.ArgumentParser(description='Fast Histogram Merger')
     parser.add_argument("-t", '--tag', type=str, default="algiers", help="Tag name to match files")
     parser.add_argument('--era', type=str, default="2018", help="Era to match files")
+    parser.add_argument("-f",'--filename', type=str, default="latest_DD", help="file name")
     options = parser.parse_args()
 
     file_list = glob.glob(f'*{options.tag}*_{options.era}_*/*.pkl.gz')
@@ -57,7 +58,7 @@ def merger():
         for s, h in tqdm(combined_hist.items(), desc="Finalizing", ncols=75)
     }
 
-    output_file = f"merged-histogram-{options.tag}-{options.era}-Inc_WZ_latest_DD_generic_had_mT_latest.pkl.gz"
+    output_file = f"merged-histogram-Inc-{options.tag}-{options.era}-{options.filename}.pkl.gz"
     with gzip.open(output_file, "wb") as f:
         pickle.dump(combined_dict, f)
 

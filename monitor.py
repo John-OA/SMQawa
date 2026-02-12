@@ -93,6 +93,7 @@ echo " ------ THE END (everyone dies !) ----- "
 
 def main():
     parser = argparse.ArgumentParser(description='Famous Submitter')
+    parser.add_argument("-a"   , "--analysis", type=str, default="inc-WZ"       , help="Analysis to run", required=True)
     parser.add_argument("-i"   , "--input" , type=str, default="input"  , required=True)
     parser.add_argument("-t"   , "--tag"   , type=str, default="algiers", required=True)
     parser.add_argument("-isMC", "--isMC"  , type=int, default=1        , help="")

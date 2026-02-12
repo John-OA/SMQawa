@@ -138,19 +138,65 @@ def build_htaus_loose(tau, lepton):
     )
     
     return tau[base_selection & ~overlap_leptons]
-    
 
-def build_photons(photon):
-    base = (
-        (photon.pt          > 20. ) & 
-        (np.abs(photon.eta) < 2.5 )
-    )
-    # MVA ID
-    tight_photons = photon[base & photon.mvaID_WP90]
-    loose_photons = photon[base & photon.mvaID_WP80 & ~photon.mvaID_WP90]
+
+def build_jets(jets, tight_leptons, taus_loose, btag_wp, era, isAPV):
+
+    overlap_leptons = ak.any(jets.metric_table(tight_leptons) <= 0.4, axis=2)
+    overlap_taus = ak.any(jets.metric_table(taus_loose) <= 0.4, axis=2)
+
+
+    jet_mask = (
+            ~overlap_leptons & 
+            ~overlap_taus &
+            (jets.pt>30.0) & 
+            (np.abs(jets.eta) < 4.7) & 
+            (jets.jetId >= 6) & # tight JetID 7(2016) and 6(2017/8)
+            ((jets.puId >= 6) | (jets.puId == 3) | (jets.pt >= 50)) # medium puID https://twiki.cern.ch/twiki/bin/viewauth/CMS/PileupJetIDUL 3,7 for 16and 16APV; 6,7 for 17,18
+        )
+
+    jet_btag = (
+                jets.btagDeepFlavB > btag_id(
+                    btag_wp, 
+                    era + 'APV' if isAPV else era
+                ) 
+        ) & (np.abs(jets.eta)<2.4)
+
+    return jets[jet_mask], jets[jet_mask & jet_btag] 
+
+def apply_hem_uncertainty(jets, met):
     
-    # cut based ID
-    return tight_photons, loose_photons
+    phi_mask = (
+        (jets.phi > -1.57) &
+        (jets.phi < -0.87)
+    )
+    eta_mask_20 = (jets.eta > -2.5) & (jets.eta < -1.3)
+    eta_mask_35 = (jets.eta > -3.0) & (jets.eta < -2.5)
+    
+    mask_20 = phi_mask & eta_mask_20
+    mask_35 = phi_mask & eta_mask_35
+
+    scale = ak.ones_like(jets.pt)
+    scale = ak.where(mask_20, 0.80, scale)
+    scale = ak.where(mask_35, 0.65, scale)
+
+    scaled_jets = ak.with_field(jets, jets.pt * scale, 'pt')
+    scaled_jets = ak.with_field(scaled_jets, jets.mass * scale, 'mass')
+
+    delta_px = ak.sum((jets.pt - scaled_jets.pt) * np.cos(jets.phi), axis=1, mask_identity=False) #delta is negative vector sum of corrected jet_pt minus old jet_pt
+    delta_py = ak.sum((jets.pt - scaled_jets.pt) * np.sin(jets.phi), axis=1, mask_identity=False)
+
+    met_px = met.pt * np.cos(met.phi)
+    met_py = met.pt * np.sin(met.phi)
+    shifted_px = met_px + delta_px
+    shifted_py = met_py + delta_py
+    shifted_pt = np.sqrt(shifted_px**2 + shifted_py**2)
+    shifted_phi = np.arctan2(shifted_py, shifted_px)
+
+    scaled_met = ak.with_field(met, shifted_pt, 'pt')
+    scaled_met = ak.with_field(scaled_met, shifted_phi, 'phi')
+
+    return scaled_jets, scaled_met
 
 
 class wzinclusive_processor(processor.ProcessorABC):
@@ -339,7 +385,7 @@ class wzinclusive_processor(processor.ProcessorABC):
             'taus_phi': hist.Hist(
                 hist.axis.StrCategory([], name="channel"   , growth=True),
                 hist.axis.StrCategory([], name="systematic", growth=True), 
-                hist.axis.Regular(50, -3.2, 3.2, name="taus_phi", label=r"$\phi(\tau)$"),
+                hist.axis.Regular(50, -np.pi, np.pi, name="taus_phi", label=r"$\phi(\tau)$"),
                 hist.storage.Weight()
             ),
             'tau_pt_loose': hist.Hist(
@@ -358,19 +404,19 @@ class wzinclusive_processor(processor.ProcessorABC):
             'taus_phi_loose': hist.Hist(
                 hist.axis.StrCategory([], name="channel"   , growth=True),
                 hist.axis.StrCategory([], name="systematic", growth=True), 
-                hist.axis.Regular(50, -3.2, 3.2, name="taus_phi_loose", label=r"$\phi(\tau loose)$"),
+                hist.axis.Regular(50, -np.pi, np.pi, name="taus_phi_loose", label=r"$\phi(\tau loose)$"),
                 hist.storage.Weight()
             ),
             'met_phi': hist.Hist(
                 hist.axis.StrCategory([], name="channel"   , growth=True),
                 hist.axis.StrCategory([], name="systematic", growth=True), 
-                hist.axis.Regular(50, -3.2, 3.2, name="met_phi", label=r"$\phi(p_{T}^{miss})$"),
+                hist.axis.Regular(50, -np.pi, np.pi, name="met_phi", label=r"$\phi(p_{T}^{miss})$"),
                 hist.storage.Weight()
             ),
             'delta_tau_met_phi': hist.Hist(
                 hist.axis.StrCategory([], name="channel"   , growth=True),
                 hist.axis.StrCategory([], name="systematic", growth=True), 
-                hist.axis.Regular(50, -3.2, 3.2, name="delta_tau_met_phi", label=r"$\Delta \phi(\tau, p_{T}^{miss})$"),
+                hist.axis.Regular(50, -np.pi, np.pi, name="delta_tau_met_phi", label=r"$\Delta \phi(\tau, p_{T}^{miss})$"),
                 hist.storage.Weight()
             ),
             'deep_tau_jet': hist.Hist(
@@ -394,43 +440,43 @@ class wzinclusive_processor(processor.ProcessorABC):
             'dphi_met_ll': hist.Hist(
                 hist.axis.StrCategory([], name="channel"   , growth=True),
                 hist.axis.StrCategory([], name="systematic", growth=True), 
-                hist.axis.Regular(50, -3.2, 3.2, name="dphi_met_ll", label=r"$\Delta \phi(\ell\ell,p_{T}^{miss})$"),
+                hist.axis.Regular(50, -np.pi, np.pi, name="dphi_met_ll", label=r"$\Delta \phi(\ell\ell,p_{T}^{miss})$"),
                 hist.storage.Weight()
             ),
             'dphi_jet_met': hist.Hist(
                 hist.axis.StrCategory([], name="channel"   , growth=True),
                 hist.axis.StrCategory([], name="systematic", growth=True), 
-                hist.axis.Regular(50, -3.2, 3.2, name="dphi_jet_met", label=r"$\Delta \phi(j,p_{T}^{miss})$"),
+                hist.axis.Regular(50, -np.pi, np.pi, name="dphi_jet_met", label=r"$\Delta \phi(j,p_{T}^{miss})$"),
                 hist.storage.Weight()
             ),
             'dilep_dphi_tau': hist.Hist(
                 hist.axis.StrCategory([], name="channel"   , growth=True),
                 hist.axis.StrCategory([], name="systematic", growth=True), 
-                hist.axis.Regular(50, -3.2, 3.2, name="dilep_dphi_tau", label=r"$\Delta \phi(\ell\ell,\tau)$"),
+                hist.axis.Regular(50, -np.pi, np.pi, name="dilep_dphi_tau", label=r"$\Delta \phi(\ell\ell,\tau)$"),
                 hist.storage.Weight()
             ),
             'dilep_loose_tau_met_dphi': hist.Hist(
                 hist.axis.StrCategory([], name="channel"   , growth=True),
                 hist.axis.StrCategory([], name="systematic", growth=True), 
-                hist.axis.Regular(50, -3.2, 3.2, name="dilep_loose_tau_met_dphi", label=r"$\Delta \phi(\ell\ell\tau, p_{T}^{miss})$"),
+                hist.axis.Regular(50, -np.pi, np.pi, name="dilep_loose_tau_met_dphi", label=r"$\Delta \phi(\ell\ell\tau, p_{T}^{miss})$"),
                 hist.storage.Weight()
             ),
             'dilep_loose_tau_phi': hist.Hist(
                 hist.axis.StrCategory([], name="channel"   , growth=True),
                 hist.axis.StrCategory([], name="systematic", growth=True), 
-                hist.axis.Regular(50, -3.2, 3.2, name="dilep_loose_tau_phi", label=r"$\phi(\ell\ell\tau)$"),
+                hist.axis.Regular(50, -np.pi, np.pi, name="dilep_loose_tau_phi", label=r"$\phi(\ell\ell\tau)$"),
                 hist.storage.Weight()
             ),
             'dilep_tau_phi': hist.Hist(
                 hist.axis.StrCategory([], name="channel"   , growth=True),
                 hist.axis.StrCategory([], name="systematic", growth=True), 
-                hist.axis.Regular(50, -3.2, 3.2, name="dilep_tau_phi", label=r"$\phi(\ell\ell\tau)$"),
+                hist.axis.Regular(50, -np.pi, np.pi, name="dilep_tau_phi", label=r"$\phi(\ell\ell\tau)$"),
                 hist.storage.Weight()
             ),
             'dilep_dphi': hist.Hist(
                 hist.axis.StrCategory([], name="channel"   , growth=True),
                 hist.axis.StrCategory([], name="systematic", growth=True), 
-                hist.axis.Regular(50, -3.2, 3.2, name="dilep_dphi", label=r"$\Delta \phi(\ell\ell)$"),
+                hist.axis.Regular(50, -np.pi, np.pi, name="dilep_dphi", label=r"$\Delta \phi(\ell\ell)$"),
                 hist.storage.Weight()
             ),
             'baseweight': hist.Hist(
@@ -454,7 +500,7 @@ class wzinclusive_processor(processor.ProcessorABC):
             'lead_jet_phi': hist.Hist(
                 hist.axis.StrCategory([], name="channel"   , growth=True),
                 hist.axis.StrCategory([], name="systematic", growth=True), 
-                hist.axis.Regular(50, -3.2, 3.2, name="lead_jet_phi", label=r"$\phi($p_T^{j_1})$"),
+                hist.axis.Regular(50, -np.pi, np.pi, name="lead_jet_phi", label=r"$\phi($p_T^{j_1})$"),
                 hist.storage.Weight()
             ),
             'lead_jet_eta': hist.Hist(
@@ -484,7 +530,7 @@ class wzinclusive_processor(processor.ProcessorABC):
             'min_dphi_met_j': hist.Hist( 
                 hist.axis.StrCategory([], name="channel"   , growth=True),
                 hist.axis.StrCategory([], name="systematic", growth=True), 
-                hist.axis.Regular(50, -3.2, 3.2, name="min_dphi_met_j", label=r"$\min\Delta\phi(p_{T}^{miss},j)$"),
+                hist.axis.Regular(50, -np.pi, np.pi, name="min_dphi_met_j", label=r"$\min\Delta\phi(p_{T}^{miss},j)$"),
                 hist.storage.Weight()
             ),
             'leading_lep_pt': hist.Hist(
@@ -687,50 +733,38 @@ class wzinclusive_processor(processor.ProcessorABC):
         deep_tau_mu = lead_tau.rawDeepTau2017v2p1VSmu
         deep_tau_jet = lead_tau.rawDeepTau2017v2p1VSjet
 
-        # print("deep_tau_e", deep_tau_e)
-        # print("deep_tau_mu", deep_tau_mu)
-        # print("deep_tau_jet", deep_tau_jet)
-
         
         jets = event.Jet
-        overlap_leptons = ak.any(
-            jets.metric_table(tight_lep) <= 0.4,
-            axis=2
-        )
-        overlap_taus = ak.any(
-            jets.metric_table(had_taus_loose) <= 0.4, #replaced vtight tau to loose tau
-            axis=2
-        )
+        # overlap_leptons = ak.any(
+        #     jets.metric_table(tight_lep) <= 0.4,
+        #     axis=2
+        # )
+        # overlap_taus = ak.any(
+        #     jets.metric_table(had_taus_loose) <= 0.4, #replaced vtight tau to loose tau
+        #     axis=2
+        # )
         
-        jet_mask = (
-            ~overlap_leptons & 
-            ~overlap_taus &
-            (jets.pt>30.0) & 
-            (np.abs(jets.eta) < 4.7) & 
-            (jets.jetId >= 6) & # tight JetID 7(2016) and 6(2017/8)
-            ((jets.puId >= 6) | (jets.puId == 3) | (jets.pt >= 50)) # medium puID https://twiki.cern.ch/twiki/bin/viewauth/CMS/PileupJetIDUL 3,7 for 16and 16APV; 6,7 for 17,18
-        )
-        
-        jet_mask_PUID = (
-            ~overlap_leptons & 
-            ~overlap_taus &
-            (jets.pt>30.0) & 
-            (np.abs(jets.eta) < 4.7) & 
-            (jets.jetId >= 6) # tight JetID 7(2016) and 6(2017/18)
-        )
+        # jet_mask = (
+        #     ~overlap_leptons & 
+        #     ~overlap_taus &
+        #     (jets.pt>30.0) & 
+        #     (np.abs(jets.eta) < 4.7) & 
+        #     (jets.jetId >= 6) & # tight JetID 7(2016) and 6(2017/8)
+        #     ((jets.puId >= 6) | (jets.puId == 3) | (jets.pt >= 50)) # medium puID https://twiki.cern.ch/twiki/bin/viewauth/CMS/PileupJetIDUL 3,7 for 16and 16APV; 6,7 for 17,18
+        # )
 
-        jet_btag = (
-                event.Jet.btagDeepFlavB > btag_id(
-                    self.btag_wp, 
-                    self._era + 'APV' if self._isAPV else self._era
-                )
-        )
+        # jet_btag = (
+        #         event.Jet.btagDeepFlavB > btag_id(
+        #             self.btag_wp, 
+        #             self._era + 'APV' if self._isAPV else self._era
+        #         )
+        # )
         
-        good_jets = jets[jet_mask] # removed ~jet_btag
-        good_bjet = jets[jet_btag & jet_mask & (np.abs(jets.eta)<2.4)]
+        good_jets, good_bjet = build_jets(jets, tight_lep, had_taus_loose, self.btag_wp, self._era, self._isAPV)
+        # good_jets = jets[jet_mask] # removed ~jet_btag
+        # good_bjet = jets[jet_btag & jet_mask & (np.abs(jets.eta)<2.4)]
         
-        # pu_good_jets = jets[~jet_btag & jet_mask_PUID & ~ak.is_none(jets.pt)]
-        pu_good_jets = jets[~jet_btag & jet_mask_PUID]
+    
         ngood_jets  = ak.num(good_jets)
         ngood_bjets = ak.num(good_bjet)
         
@@ -740,9 +774,7 @@ class wzinclusive_processor(processor.ProcessorABC):
         # lepton quantities
         def z_lepton_pair(leptons):
             pair = ak.combinations(leptons, 2, axis=1, fields=['l1', 'l2'])
-            #lep_3 = ak.combinations(leptons, 3, axis=1, fields=['l1', 'l2', 't'])
             mass = (pair.l1 + pair.l2).mass
-            #mass_llt = (pair.l1 + pair.l2 + pair.t).mass
             cand = ak.local_index(mass, axis=1) == ak.argmin(np.abs(mass - self.zmass), axis=1)
 
             extra_lepton = leptons[(
@@ -778,8 +810,6 @@ class wzinclusive_processor(processor.ProcessorABC):
         emu_met = ak.firsts(extra_lep, axis=1) + p4_met
         reco_met_pt = ak.where(ntight_lep==2, p4_met.pt, emu_met.pt)
         reco_met_phi = ak.where(ntight_lep==2, p4_met.phi, emu_met.phi)
-        #print("reco_met = ", reco_met_pt)
-        #print("reco_phi", reco_met_phi)
 
     
         # this definition is not correct as it doesn't include the mass of the second Z
@@ -844,8 +874,6 @@ class wzinclusive_processor(processor.ProcessorABC):
         dijet_deta = np.abs(lead_jet.eta - subl_jet.eta)
         event['dijet_mass'] = dijet_mass
         event['dijet_deta'] = dijet_deta 
-        #dijet_zep1 = np.abs(2*lead_lep.eta - (lead_jet.eta + subl_jet.eta))/dijet_deta
-        #dijet_zep2 = np.abs(2*subl_lep.eta - (lead_jet.eta + subl_jet.eta))/dijet_deta
         
         min_dphi_met_j = ak.min(np.abs(
             ak.where(
@@ -980,7 +1008,7 @@ class wzinclusive_processor(processor.ProcessorABC):
         if not is_data:
             weights.add('genweight', event.genWeight)
             # self._btag.append_btag_sf(jets, weights)
-            self._jpSF.append_jetPU_sf(pu_good_jets, weights)
+            self._jpSF.append_jetPU_sf(good_jets, weights)
             self._purw.append_pileup_weight(weights, event.Pileup.nTrueInt) # fix: https://github.com/9GaoHong/SMQawa_update/commit/d6cdebda4856593162c03365eb9d9a91ceb1a185
             self._tauID.append_tauID_sf(had_taus, weights)
             self._add_trigger_sf(weights, lead_lep, subl_lep)
@@ -1252,18 +1280,6 @@ class wzinclusive_processor(processor.ProcessorABC):
         jets_to_correct_met = self._jmeu.corrected_jets_L123_noJER(event.Jet, event.fixedGridRhoFastjetAll, event.caches[0])
         met = self._jmeu.corrected_met(met_to_correct, jets, event.fixedGridRhoFastjetAll, event.caches[0]) # we are adding fully smeared L123 jets
 
-        #test with some chaneges 
-        # met = self._jmeu.corrected_met(met_to_correct, jets_to_correct_met, event.fixedGridRhoFastjetAll, event.caches[0])
-        
-        # print("---- JET MET Debug ----")
-        # print("Raw MET pt:", ak.to_list(event.RawMET.pt[:10]))
-        # print("Original type 1 corrected MET pt from NanoAOD:", ak.to_list(event.MET.pt[:10]))
-        # print("Coffea Corrected MET pt:", ak.to_list(met.pt[:10]))
-        # print("Original jets from NanoAOD :", ak.to_list(event.Jet.pt[:5]))
-        # print("jets for Met correction without JER :", ak.to_list(jets_to_correct_met.pt[:5]))
-        # print("Jet pt with L123 and JER:", ak.to_list(jets.pt[:5]))
-    
-
         event = ak.with_field(event, event.Jet, 'OrigJet')
         event = ak.with_field(event, event.MET, 'OrigMET')
         event = ak.with_field(event, jets, 'Jet')
@@ -1286,31 +1302,12 @@ class wzinclusive_processor(processor.ProcessorABC):
             
             # Apply rochester_correction
             muon = event.Muon 
-            muonEnUp=event.Muon
-            muonEnDown=event.Muon
             muon_pt,muon_pt_roccorUp,muon_pt_roccorDown=rochester_correction(is_data).apply_rochester_correction (muon)
-
             muon['pt'] = muon_pt
-            muonEnUp['pt'] = muon_pt_roccorUp
-            muonEnDown['pt'] = muon_pt_roccorDown
             event = ak.with_field(event, muon, 'Muon')
 
-            # HEM15/16 issue
-            if self._era == "2018":
-                _runid = (event.run >= 319077)
-                jets = event.Jet
-                j_mask = ak.where((jets.phi > -1.57) & (jets.phi < -0.87) &
-                                  (jets.eta > -2.50) & (jets.eta <  1.30) & 
-                                  _runid, 0.8, 1)
-                # met = event.MET
-                # event['met_pt'] = met.pt
-                # event['met_phi'] = met.phi            
-                jets['pt']   = j_mask * jets.pt
-                jets['mass'] = j_mask * jets.mass
-
-                event = ak.with_field(event, jets, 'Jet')
-                
             return self.process_shift(event, None)
+
         
         # Adding scale factors to Muon and Electron fields
         muon = event.Muon 
@@ -1364,7 +1361,6 @@ class wzinclusive_processor(processor.ProcessorABC):
         tauEnDown['mass'] = tau_mass_EnDown
         event = ak.with_field(event, tau, 'Tau')
 
-
     
         # define all the shifts
         shifts = [
@@ -1412,22 +1408,14 @@ class wzinclusive_processor(processor.ProcessorABC):
             ({"Tau": tauEnDown}, "TauEnDown"),
 
         ]
-        
-        # print("final corrected jet_pt =", jets.pt[:5])
-        # print("jet_JES_total_up =", jets.JES_Total.up.pt[:5])
-        # print("jet_JES_total_down =",jets.JES_Total.down.pt[:5])
-        # print("final corrected MET pt= ", met.pt[:10])
-        # print("final corrected met phi = ", met.phi[:10])
-        # print("MET_jes_total_up =",met.JES_Total.up.pt[:10])
-        # print("MET_jes_total_down =",met.JES_Total.down.pt[:10])
-        # print("METphi_jes_total_up =",met.JES_Total.up.phi[:10])
-        # print("METphi_jes_total_down =",met.JES_Total.down.phi[:10])
-        # print("jet_jer_up =", jets.JER.up.pt[:5])
-        # print("jet_jer_down =",jets.JER.down.pt[:5])
-        # print("met_jer_up =", met.JER.up.pt[:10])
-        # print("met_jer_down =",met.JER.down.pt[:10])
-        # print("metphi_jer_up =", met.JER.up.phi[:10])
-        # print("metphi_jer_down =",met.JER.down.phi[:10])
+
+        if (self._era == '2018') and (not is_data):
+            hem_jets, hem_met = apply_hem_uncertainty(
+                event.Jet,
+                event.MET
+            )
+            shifts.append(({"Jet": hem_jets, "MET": hem_met}, "HEMDown"))
+            shifts.append(({"Jet": event.Jet, "MET": event.MET}, "HEMUp"))
 
         shifts = [
             self.process_shift(

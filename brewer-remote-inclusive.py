@@ -204,6 +204,7 @@ def main():
             )
             if options.analysis in ["inc-WZ"]:
                 from qawa.process.wztau2lnu_inclusive import wzinclusive_processor
+                print(" --- wztau2lnu_inclusive main code processor ... ")
                 proc_configured = wzinclusive_processor(
                     era=options.era,
                     ewk_process_name=ewk_flag,
@@ -211,12 +212,14 @@ def main():
                 )
             elif options.analysis in ["inc-WZ-Fxsec"]:
                 from qawa.process.Fxsec import wzinclusive_processor # Fiducial XSec test processor for inc-WZ
+                print(" --- wztau2lnu_inclusive FV Xsec processor ... ")
                 proc_configured = wzinclusive_processor(
                     era=options.era,
                     ewk_process_name=ewk_flag,
                     run_period=options.runperiod if is_data else ''
                 )
             elif options.analysis in ["trig-eff"]:
+                print(" --- wztau2lnu_inclusive trigger efficiency processor ... ")
                 from qawa.process.trig_eff import trig_processor
                 proc_configured = trig_processor(
                     isMC=options.isMC,
@@ -224,7 +227,7 @@ def main():
             else:
                 raise NotImplementedError(f"{options.analysis} does not have hooks for loading a processor, please update the code to point appropriately to it, along with any necessary init configuration options.")
 
-            print(" --- wztau2lnu_inclusive processor ... ")
+            # print(" --- wztau2lnu_inclusive processor ... ")
             vbs_runner = processor.Runner(
                 executor=executor,
                 schema=NanoAODSchema,
