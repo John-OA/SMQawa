@@ -700,11 +700,13 @@ class wzinclusive_processor(processor.ProcessorABC):
                 event.Flag.BadPFMuonFilter
             )
 
-
+        # Electrons and Muons and Taus
         tight_lep, loose_lep = build_leptons(
             event.Muon,
             event.Electron
         )
+        tight_sorter = ak.argsort(tight_lep.pt, axis=1, ascending=False)
+        tight_lep = tight_lep[tight_sorter]
         
         had_taus = build_htaus(event.Tau, tight_lep)
         had_taus_loose = build_htaus_loose(event.Tau, tight_lep)
@@ -733,38 +735,9 @@ class wzinclusive_processor(processor.ProcessorABC):
         deep_tau_mu = lead_tau.rawDeepTau2017v2p1VSmu
         deep_tau_jet = lead_tau.rawDeepTau2017v2p1VSjet
 
-        
-        jets = event.Jet
-        # overlap_leptons = ak.any(
-        #     jets.metric_table(tight_lep) <= 0.4,
-        #     axis=2
-        # )
-        # overlap_taus = ak.any(
-        #     jets.metric_table(had_taus_loose) <= 0.4, #replaced vtight tau to loose tau
-        #     axis=2
-        # )
-        
-        # jet_mask = (
-        #     ~overlap_leptons & 
-        #     ~overlap_taus &
-        #     (jets.pt>30.0) & 
-        #     (np.abs(jets.eta) < 4.7) & 
-        #     (jets.jetId >= 6) & # tight JetID 7(2016) and 6(2017/8)
-        #     ((jets.puId >= 6) | (jets.puId == 3) | (jets.pt >= 50)) # medium puID https://twiki.cern.ch/twiki/bin/viewauth/CMS/PileupJetIDUL 3,7 for 16and 16APV; 6,7 for 17,18
-        # )
-
-        # jet_btag = (
-        #         event.Jet.btagDeepFlavB > btag_id(
-        #             self.btag_wp, 
-        #             self._era + 'APV' if self._isAPV else self._era
-        #         )
-        # )
-        
+        jets = event.Jet        
         good_jets, good_bjet = build_jets(jets, tight_lep, had_taus_loose, self.btag_wp, self._era, self._isAPV)
-        # good_jets = jets[jet_mask] # removed ~jet_btag
-        # good_bjet = jets[jet_btag & jet_mask & (np.abs(jets.eta)<2.4)]
         
-    
         ngood_jets  = ak.num(good_jets)
         ngood_bjets = ak.num(good_bjet)
         
@@ -782,11 +755,12 @@ class wzinclusive_processor(processor.ProcessorABC):
                 ~ak.any(leptons.metric_table(pair[cand].l2) <= 0.01, axis=2) )
             ]
             return pair[cand], extra_lepton, cand
-        
         dilep, extra_lep, z_cand_mask = z_lepton_pair(tight_lep)
-        
-        lead_lep = ak.firsts(ak.where(dilep.l1.pt >  dilep.l2.pt, dilep.l1, dilep.l2),axis=1)
-        subl_lep = ak.firsts(ak.where(dilep.l1.pt <= dilep.l2.pt, dilep.l1, dilep.l2),axis=1)
+        # this doesn't work in coffea 202X, so instead we sort leptons to guarantee the first is the higher in the pair
+        # lead_lep = ak.firsts(ak.where(dilep.l1.pt >  dilep.l2.pt, dilep.l1, dilep.l2),axis=1)
+        # subl_lep = ak.firsts(ak.where(dilep.l1.pt <= dilep.l2.pt, dilep.l1, dilep.l2),axis=1)
+        lead_lep = ak.firsts(dilep.l1)
+        subl_lep = ak.firsts(dilep.l2)
         
         
         dilep_p4 = (lead_lep + subl_lep)
@@ -892,28 +866,28 @@ class wzinclusive_processor(processor.ProcessorABC):
             (ak.firsts(tight_lep).pt>25) &
             ak.fill_none((lead_lep.pdgId + subl_lep.pdgId)==0, False)
         )
-        
+        # FIXME: this isn't osof, it's either sssf or osof together, FIX!
         selection.add(
             "require-osof",
             (ntight_lep==2) & (nloose_lep==0) &
             (ak.firsts(tight_lep).pt>25) &
            ak.fill_none(np.abs(lead_lep.pdgId) != np.abs(subl_lep.pdgId), False)
         )
-        
+
         selection.add(
             "require-2lep",
             (ntight_lep==2) & (nloose_lep==0) &
             (ak.firsts(tight_lep).pt>25) &
             ak.fill_none((lead_lep.pdgId + subl_lep.pdgId)==0, False)
         )
-
+        # FIXME?: this is osof on the two leading electrons/muons, but third electron/muon too
         selection.add(
             "require-3lep",
             (ntight_lep==3) & (nloose_lep==0) &
             (ak.firsts(tight_lep).pt>25) &
             ak.fill_none((lead_lep.pdgId + subl_lep.pdgId)==0, False)
         )
-        
+        # FIXME?: this is 2 tight leps osof + 2 loose or tight electrons/muons as well
         selection.add(
             "require-4lep",
             (ntight_lep>=2) & (nloose_lep + ntight_lep)==4 &
@@ -1263,22 +1237,22 @@ class wzinclusive_processor(processor.ProcessorABC):
                 _histogram_filler(ch, sys, 'ST')
         return {dataset: histos}
         
-    def process(self, event: processor.LazyDataFrame):
+    def process(self, event):
         dataset_name = event.metadata['dataset']
         is_data = event.metadata.get("is_data")
         
 
         # JES/JER corrections
         rho = event.fixedGridRhoFastjetAll
-        cache = event.caches[0]
+        cache = {}
 
         
         raw_met = event.RawMET
         met_to_correct = event.MET
        
-        jets = self._jmeu.corrected_jets_L123_JER(event.Jet, event.fixedGridRhoFastjetAll, event.caches[0])
-        jets_to_correct_met = self._jmeu.corrected_jets_L123_noJER(event.Jet, event.fixedGridRhoFastjetAll, event.caches[0])
-        met = self._jmeu.corrected_met(met_to_correct, jets, event.fixedGridRhoFastjetAll, event.caches[0]) # we are adding fully smeared L123 jets
+        jets = self._jmeu.corrected_jets_L123_JER(event.Jet, event.fixedGridRhoFastjetAll, cache)
+        jets_to_correct_met = self._jmeu.corrected_jets_L123_noJER(event.Jet, event.fixedGridRhoFastjetAll, cache)
+        met = self._jmeu.corrected_met(met_to_correct, jets, event.fixedGridRhoFastjetAll, cache) # we are adding fully smeared L123 jets
 
         event = ak.with_field(event, event.Jet, 'OrigJet')
         event = ak.with_field(event, event.MET, 'OrigMET')
