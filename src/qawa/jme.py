@@ -21,7 +21,7 @@ jec_name_map = {
     'JetA': 'area',
     'ptRaw': 'pt_raw',
     'massRaw': 'mass_raw',
-    'Rho': 'rho',
+    'Rho': 'rhoFixedGridFastJetAll',
     'METpt': 'pt',
     'METphi': 'phi',
     'JetPhi': 'phi',
@@ -45,7 +45,7 @@ def add_jme_variables(jets, events_rho, pt_gen=None):
         jets['pt_gen'] = ak.values_astype(ak.fill_none(pt_gen, 0), np.float32)
     else:
         jets['pt_gen'] = ak.Array(np.zeros(len(jets), dtype=np.float32))
-    jets['rho'     ] = ak.broadcast_arrays(events_rho, jets.pt)[0]
+    jets['rhoFixedGridFastJetAll'] = ak.broadcast_arrays(events_rho, jets.pt)[0]
     return jets
 
 class JMEUncertainty:
@@ -131,7 +131,7 @@ class JMEUncertainty:
     def corrected_jets_L123(self, jets, event_rho, lazy_cache, pt_gen=None):
         jet_pt_L123 = self.jec_factory_L123.build(
             add_jme_variables(jets, event_rho, pt_gen),
-            lazy_cache=lazy_cache
+            # lazy_cache=lazy_cache
         )
         emFraction = jet_pt_L123.chEmEF + jet_pt_L123.neEmEF
         mask_jec = (jet_pt_L123['pt'] > 15) & (emFraction <= 0.9)
@@ -143,7 +143,7 @@ class JMEUncertainty:
     def corrected_jets_L1(self, jets, event_rho, lazy_cache, pt_gen=None):
         jet_pt_L1 = self.jec_factory_L1.build(
             add_jme_variables(jets, event_rho, pt_gen),
-            lazy_cache=lazy_cache
+            # lazy_cache=lazy_cache
         )
         jet_pt_L1['pt'] = jet_pt_L1['pt'] * (1 - jet_pt_L1.muonSubtrFactor)
         return jet_pt_L1
@@ -154,7 +154,7 @@ class JMEUncertainty:
         jets = add_jme_variables(jets, event_rho)
         return self.jec_factory_L123_JER.build(
             jets,
-            lazy_cache 
+            # lazy_cache
         )
 
     def corrected_jets_L123_noJER(self, jets, event_rho, lazy_cache):
@@ -162,7 +162,7 @@ class JMEUncertainty:
         #jets['pt'] = jets['pt'] * (1 - jets.muonSubtrFactor)
         return self.jec_factory_L123.build(
             jets,
-            lazy_cache 
+            # lazy_cache
         )
       #remove jets_L1  
     def corrected_met(self, met, jets_L123, event_rho, lazy_cache):
@@ -173,6 +173,5 @@ class JMEUncertainty:
         return self.met_factory.build(
             met,
             jets_L123_cleaned_for_MET,
-            lazy_cache=lazy_cache
+            # lazy_cache=lazy_cache
         )
-   
