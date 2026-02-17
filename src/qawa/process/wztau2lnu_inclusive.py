@@ -52,6 +52,13 @@ def build_leptons(muons, electrons):
         (muons.pfRelIso04_all<= 0.25) &
         muons.looseId   
     ]
+    non_iso_muons = muons[
+        ~tight_muons_mask &
+        (muons.pt            >  10. ) &
+        (np.abs(muons.eta)   <  2.4 ) &
+        (muons.pfRelIso04_all > 0.25) &
+        muons.looseId   
+    ]
     # select tight/loose electron
     # https://cms-talk.web.cern.ch/t/clarification-on-ee-eb-gap-veto/133256
     electron_superclusterEta = electrons.eta + electrons.deltaEtaSC
@@ -61,17 +68,31 @@ def build_leptons(muons, electrons):
         electrons.mvaFall17V2Iso_WP90
     )
     tight_electrons = electrons[tight_electrons_mask]
-    loose_electrons = electrons[
-        ~tight_electrons_mask &
-        (electrons.pt           > 10. ) &
-        (np.abs(electrons.eta)  < 2.5) &
+
+    loose_electrons_mask = (
+        ~tight_electrons_mask & 
+        (electrons.pt           > 10.) &
+        (np.abs(electrons.eta)  < 2.5)  &
         electrons.mvaFall17V2Iso_WPL
-    ]
+    )
+    loose_electrons = electrons[loose_electrons_mask]
+
+    non_iso_electrons_mask = (
+        ~tight_electrons_mask & 
+        ~loose_electrons_mask &
+        (electrons.pt           > 10.) &
+        (np.abs(electrons.eta)  < 2.5)  &
+        electrons.mvaFall17V2noIso_WPL
+    )
+
+    non_iso_electrons = electrons[non_iso_electrons_mask]
+
     # contruct a lepton object
     tight_leptons = ak.with_name(ak.concatenate([tight_muons, tight_electrons], axis=1), 'PtEtaPhiMCandidate')
     loose_leptons = ak.with_name(ak.concatenate([loose_muons, loose_electrons], axis=1), 'PtEtaPhiMCandidate')
+    non_iso_leptons = ak.with_name(ak.concatenate([non_iso_muons, non_iso_electrons], axis=1), 'PtEtaPhiMCandidate')
 
-    return tight_leptons, loose_leptons
+    return tight_leptons, loose_leptons, non_iso_leptons
 
 def build_htaus(tau, lepton):
     #print(dir(tau))
@@ -83,8 +104,8 @@ def build_htaus(tau, lepton):
         (np.abs(tau.dz)< 0.2 ) &
         (tau.decayMode != 5   ) & 
         (tau.decayMode != 6   ) &
-        (tau.idDeepTau2017v2p1VSe >= 2) &
-        (tau.idDeepTau2017v2p1VSmu >= 1) &
+        (tau.idDeepTau2017v2p1VSe >= 64) &
+        (tau.idDeepTau2017v2p1VSmu >= 8) &
         (tau.idDeepTau2017v2p1VSjet >= 64)
     )
 
@@ -105,8 +126,8 @@ def build_htaus_tight(tau, lepton):
         (np.abs(tau.dz)< 0.2 ) &
         (tau.decayMode != 5   ) & 
         (tau.decayMode != 6   ) &
-        (tau.idDeepTau2017v2p1VSe >= 2) &
-        (tau.idDeepTau2017v2p1VSmu >= 1) &
+        (tau.idDeepTau2017v2p1VSe >= 32) &
+        (tau.idDeepTau2017v2p1VSmu >= 4) &
         (tau.idDeepTau2017v2p1VSjet >= 32)
     )
 
@@ -127,7 +148,7 @@ def build_htaus_loose(tau, lepton):
         (np.abs(tau.dz)< 0.2 ) &
         (tau.decayMode != 5   ) & 
         (tau.decayMode != 6   ) &
-        (tau.idDeepTau2017v2p1VSe >= 2) &
+        (tau.idDeepTau2017v2p1VSe >= 1) &
         (tau.idDeepTau2017v2p1VSmu >= 1) &
         (tau.idDeepTau2017v2p1VSjet >= 1)
     )
@@ -254,8 +275,8 @@ class wzinclusive_processor(processor.ProcessorABC):
         self.btag_wp = 'L'
         self.jetPU_wp = 'M'
         self.tauIDvsjet_wp = 'VTight' #Medium is working
-        self.tauIDvse_wp = 'VVLoose'
-        self.tauIDvsmu_wp = 'VLoose'
+        self.tauIDvse_wp = 'VTight' #changing to Vloose from VVLoose
+        self.tauIDvsmu_wp = 'Tight'
         self.zmass = 91.1873 # GeV 
         self._btag = BTVCorrector(era=self._era, wp=self.btag_wp, isAPV=self._isAPV)
         self._jmeu = JMEUncertainty(jec_tag, jer_tag, era=self._era, is_mc=(len(run_period)==0))
@@ -598,7 +619,25 @@ class wzinclusive_processor(processor.ProcessorABC):
                 hist.axis.StrCategory([], name="systematic", growth=True), 
                 hist.axis.Regular(5, 0, 5, name="ntaus_loose", label=r"$N_{taus}$ (loose)"),
                 hist.storage.Weight()
-            ),  
+            ),
+            'delta_R_non_iso_lep_loose_tau': hist.Hist(
+                hist.axis.StrCategory([], name="channel"   , growth=True),
+                hist.axis.StrCategory([], name="systematic", growth=True), 
+                hist.axis.Regular(50, 0, np.pi, name="delta_R_non_iso_lep_loose_tau", label=r"$\Delta R(\tau (loose),non_iso_lep)$"),
+                hist.storage.Weight()
+            ),
+            'delta_R_non_iso_lep_vtight_tau': hist.Hist(
+                hist.axis.StrCategory([], name="channel"   , growth=True),
+                hist.axis.StrCategory([], name="systematic", growth=True), 
+                hist.axis.Regular(50, 0, np.pi, name="delta_R_non_iso_lep_vtight_tau", label=r"$\Delta R(\tau (loose),tightlep)$"),
+                hist.storage.Weight()
+            ),
+            'delta_R_non_iso_lep_tight_tau': hist.Hist(
+                hist.axis.StrCategory([], name="channel"   , growth=True),
+                hist.axis.StrCategory([], name="systematic", growth=True), 
+                hist.axis.Regular(50, 0, np.pi, name="delta_R_non_iso_lep_tight_tau", label=r"$\Delta R(\tau (loose),looselep)$"),
+                hist.storage.Weight()
+            ),
         }
 
     
@@ -701,7 +740,7 @@ class wzinclusive_processor(processor.ProcessorABC):
             )
 
 
-        tight_lep, loose_lep = build_leptons(
+        tight_lep, loose_lep, non_iso_leptons = build_leptons(
             event.Muon,
             event.Electron
         )
@@ -718,6 +757,8 @@ class wzinclusive_processor(processor.ProcessorABC):
 
         lead_tau = ak.firsts(had_taus)
         lead_tau_loose = ak.firsts(had_taus_loose)
+        lead_tau_tight = ak.firsts(had_taus_tight)
+
         tau_pt = lead_tau.pt
         taus_phi = lead_tau.phi
         taus_eta = lead_tau.eta
@@ -729,9 +770,17 @@ class wzinclusive_processor(processor.ProcessorABC):
         taus_eta_loose = lead_tau_loose.eta
         tau_E_loose = lead_tau_loose.E
 
-        deep_tau_e = lead_tau.rawDeepTau2017v2p1VSe
-        deep_tau_mu = lead_tau.rawDeepTau2017v2p1VSmu
-        deep_tau_jet = lead_tau.rawDeepTau2017v2p1VSjet
+        lead_non_iso_lep = ak.firsts(non_iso_leptons)
+        lead_lep_tight = ak.firsts(tight_lep)
+        lead_lep_loose = ak.firsts(loose_lep)
+
+        delta_R_non_iso_lep_loose_tau = lead_non_iso_lep.delta_r(lead_tau_loose)
+        delta_R_non_iso_lep_vtight_tau = lead_lep_tight.delta_r(lead_tau_loose)
+        delta_R_non_iso_lep_tight_tau = lead_lep_loose.delta_r(lead_tau_loose)
+
+        deep_tau_e = lead_tau_loose.rawDeepTau2017v2p1VSe
+        deep_tau_mu = lead_tau_loose.rawDeepTau2017v2p1VSmu
+        deep_tau_jet = lead_tau_loose.rawDeepTau2017v2p1VSjet
 
         
         jets = event.Jet
@@ -1000,7 +1049,12 @@ class wzinclusive_processor(processor.ProcessorABC):
         event['delta_R_jet_tau'] = ak.fill_none(delta_R_jet_tau,-99)
         event['delta_R_jet_dilep'] = ak.fill_none(delta_R_jet_dilep,-99)
         event['dphi_jet_met'] = ak.fill_none(dphi_jet_met,-99)
-        
+        event['deep_tau_e'] = ak.fill_none(deep_tau_e,-99)
+        event['deep_tau_mu'] = ak.fill_none(deep_tau_mu,-99)
+        event['deep_tau_jet'] = ak.fill_none(deep_tau_jet,-99)
+        event['delta_R_non_iso_lep_loose_tau'] = ak.fill_none(delta_R_non_iso_lep_loose_tau,-99)
+        event['delta_R_non_iso_lep_vtight_tau'] = ak.fill_none(delta_R_non_iso_lep_vtight_tau,-99)
+        event['delta_R_non_iso_lep_tight_tau'] = ak.fill_none(delta_R_non_iso_lep_tight_tau,-99)
 
 
         # Now adding weights
@@ -1261,6 +1315,13 @@ class wzinclusive_processor(processor.ProcessorABC):
                 _histogram_filler(ch, sys, 'dilep_mt_llnunu')
                 _histogram_filler(ch, sys, 'HTl')
                 _histogram_filler(ch, sys, 'ST')
+                _histogram_filler(ch, sys, 'deep_tau_e')
+                _histogram_filler(ch, sys, 'deep_tau_mu')
+                _histogram_filler(ch, sys, 'deep_tau_jet')
+                _histogram_filler(ch, sys, 'delta_R_non_iso_lep_loose_tau')
+                _histogram_filler(ch, sys, 'delta_R_non_iso_lep_tight_tau')
+                _histogram_filler(ch, sys, 'delta_R_non_iso_lep_vtight_tau')
+
         return {dataset: histos}
         
     def process(self, event: processor.LazyDataFrame):
