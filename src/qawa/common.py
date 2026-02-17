@@ -107,16 +107,16 @@ def met_phi_xy_correction(met, run, npv, is_mc:bool=False, era:str='2016'):
         mety_down=getattr(met, s, None).down.pt * np.sin(met.phi)+ycor
         pt_down = np.sqrt((metx_down**2)+(mety_down**2))
         phi_down = np.arctan2(mety_down,metx_down)
-        met_shift.down = ak.with_field(met_shift.down, pt_down, 'pt')
-        met_shift.down = ak.with_field(met_shift.down, phi_down, 'phi')
+        met_shift = ak.with_field(met_shift, pt_down, ['down', 'pt'])
+        met_shift = ak.with_field(met_shift, phi_down, ['down', 'phi'])
         
         metx_up=getattr(met, s, None).up.pt * np.cos(met.phi)+xcor
         mety_up=getattr(met, s, None).up.pt * np.sin(met.phi)+ycor
         pt_up = np.sqrt((metx_up**2)+(mety_up**2))
         phi_up = np.arctan2(mety_up,metx_up)
-        met_shift.up = ak.with_field(met_shift.up, pt_up, 'pt')
-        met_shift.up = ak.with_field(met_shift.up, phi_up, 'phi')
-        setattr(met, s, met_shift)
+        met_shift = ak.with_field(met_shift, pt_up, ['up', 'pt'])
+        met_shift = ak.with_field(met_shift, phi_up, ['up', 'phi'])
+        met = ak.with_field(met, met_shift, s)
     metx_ = met.pt * np.cos(met.phi)+xcor
     mety_ = met.pt * np.sin(met.phi)+ycor
 
@@ -243,15 +243,23 @@ def theory_ps_weight(weights, ps_weight):
     
 
 def transverse_energy(fourmomentum):
+    # Direct computation
     if hasattr(fourmomentum, "et"):
         # scikit-hep/vector
         return fourmomentum.et
-    elif hasattr(fourmomentum, "E"):
+    # E_t = E * pt / p  (but guard against p==0).
+    if hasattr(fourmomentum, "E") and hasattr(fourmomentum, "pt") and hasattr(fourmomentum, "p"):
         # coffea.vector
-        return fourmomentum.E * fourmomentum.pt / fourmomentum.p
-    else:
+        p = fourmomentum.p
+        # avoid division by zero; where p==0 use pt (so E*pt/p -> pt)
+        return fourmomentum.E * fourmomentum.pt / ak.where(p == 0, ak.ones_like(p), p)
+    if hasattr(fourmomentum, "t") and hasattr(fourmomentum, "pt") and hasattr(fourmomentum, "p"):
         # buggy coffea.vector
-        return fourmomentum.t * fourmomentum.pt / fourmomentum.p
+        p = fourmomentum.p
+        # avoid division by zero; where p==0 use pt (so E*pt/p -> pt)
+        return fourmomentum.t * fourmomentum.pt / ak.where(p == 0, ak.ones_like(p), p)
+    raise AttributeError("Cannot compute transverse energy from object; "
+                         "no .E/.pt/.p attributes found")
 
 
 class pileup_weights:
@@ -371,6 +379,14 @@ class ewk_corrector:
         
         
     def get_weight(self, gen_coll, x1, x2, weights=None):
+        # float32 precision is insufficient and leads to infinities in calculations, replace key p4/Energy fields with float64 parameters
+        x1 = x1 * np.float64([1.0])
+        x2 = x2 * np.float64([1.0])
+        gen_coll = ak.with_field(gen_coll, gen_coll.pt * np.float64([1.0]), "pt")
+        gen_coll = ak.with_field(gen_coll, gen_coll.eta * np.float64([1.0]), "eta")
+        gen_coll = ak.with_field(gen_coll, gen_coll.phi * np.float64([1.0]), "phi")
+        gen_coll = ak.with_field(gen_coll, gen_coll.mass * np.float64([1.0]), "mass")
+
         id_q1 = np.abs(gen_coll.pdgId[:,0])
         id_q2 = np.abs(gen_coll.pdgId[:,1])
         
@@ -412,8 +428,7 @@ class ewk_corrector:
         # getting the s hat
         vv = v1 + v2
         shat = vv.mass2
-        
-        
+
         # getting the t hat
         # Boost to the VV center of mass frame
         b_q1 = q1.boost( -vv.boostvec )
@@ -455,7 +470,7 @@ class ewk_corrector:
 
         shat = ak.nan_to_num(shat, 1.0)
         that = ak.nan_to_num(that, 1.0)
-        
+
         corr_0 = 1 + self.exterp[0](np.sqrt(shat.to_numpy()), that.to_numpy())
         corr_1 = 1 + self.exterp[1](np.sqrt(shat.to_numpy()), that.to_numpy())
         corr_2 = 1 + self.exterp[2](np.sqrt(shat.to_numpy()), that.to_numpy())
@@ -466,7 +481,7 @@ class ewk_corrector:
             vect_v_mask &
             onshell_mask
         )
-        
+
         corr_0 = np.where(corr_mask, np.ones_like(corr_0), corr_0)
         corr_1 = np.where(corr_mask, np.ones_like(corr_0), corr_1)
         corr_2 = np.where(corr_mask, np.ones_like(corr_0), corr_2)

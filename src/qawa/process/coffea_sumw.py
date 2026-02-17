@@ -6,7 +6,7 @@ class coffea_sumw(processor.ProcessorABC):
     def __init__(self):
         super().__init__()
 
-    def process(self, event: processor.LazyDataFrame):
+    def process(self, event):
         dataset_name = event.metadata['dataset']
         is_data = event.metadata.get("is_data")
 

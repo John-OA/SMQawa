@@ -1096,7 +1096,7 @@ class wzinclusive_processor(processor.ProcessorABC):
                 
         return {dataset: histos}
         
-    def process(self, event: processor.LazyDataFrame):
+    def process(self, event):
         dataset_name = event.metadata['dataset']
         is_data = event.metadata.get("is_data")
         

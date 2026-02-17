@@ -46,7 +46,7 @@ voms-proxy-init -voms cms --valid 192:00 --out \$HOME/x509up_u\$UID
 export X509_USER_PROXY=\$HOME/x509up_u\$UID
 
 if [[ "\$1" == "" ]]; then
-  export COFFEA_IMAGE="coffeateam/coffea-base-almalinux9:0.7.26-py3.10"
+  export COFFEA_IMAGE="coffeateam/coffea-dask-almalinux9:2025.12.0-py3.12"
 else
   export COFFEA_IMAGE="\$1"
 fi
@@ -104,21 +104,21 @@ install_env() {
   source \$INSTALL_LOC.env/bin/activate
   unlink \$INSTALL_LOC.env/lib64  # HTCondor can't transfer symlink to directory and it appears optional
   cd \${INSTALL_LOC}
-  if [ ! -d "coffea" ]; then
-    echo "Cloning coffea for editable install"
-    git clone -b smqawa-wz2ltaunu http://github.com/NJManganelli/coffea.git
-  fi
-  cd coffea
-  \$INSTALL_LOC.env/bin/python -m pip install -e .
-  cd ..
+  # if [ ! -d "coffea" ]; then
+  #   echo "Cloning coffea for editable install"
+  #   git clone -b smqawa-wz2ltaunu http://github.com/NJManganelli/coffea.git
+  # fi
+  # cd coffea
+  # \$INSTALL_LOC.env/bin/python -m pip install -e .
+  # cd ..
   cd SMQawa
   \$INSTALL_LOC.env/bin/python -m pip install -e .
   cd ..
-  \$INSTALL_LOC.env/bin/python -m pip install --upgrade 'boost_histogram >= 1.5.1'
+  \$INSTALL_LOC.env/bin/python -m pip install --upgrade 'hist >= 2.10.0' 'boost_histogram >= 1.7.1' 'mplhep >= 1.0.0'
   if [ ! -d "DCTools" ]; then
     echo "DCTools should be cloned into the directory adjacent to SMQawa to enable combine card building and postfit plotting"
     echo "e.g. git clone -b main git@github.com:yhaddad/DCTools.git for main branch"
-    echo "For current development branch, git clone -b fix-lumi-uncertainties git@github.com:NJManganelli/DCTools.git"
+    echo "For current development branch, git clone -b VZ_main git@github.com:NJManganelli/DCTools.git"
   fi
   echo "done."
 }
@@ -189,21 +189,21 @@ install_env() {
   source \$INSTALL_LOC.env/bin/activate
   unlink \$INSTALL_LOC.env/lib64  # HTCondor can't transfer symlink to directory and it appears optional
   cd \${INSTALL_LOC}
-  if [ ! -d "coffea" ]; then
-    echo "Cloning coffea for editable install"
-    git clone -b smqawa-wz2ltaunu http://github.com/NJManganelli/coffea.git
-  fi
-  cd coffea
-  \$INSTALL_LOC.env/bin/python -m pip install -e .
-  cd ..
+  # if [ ! -d "coffea" ]; then
+  #   echo "Cloning coffea for editable install"
+  #   git clone -b smqawa-wz2ltaunu http://github.com/NJManganelli/coffea.git
+  # fi
+  # cd coffea
+  # \$INSTALL_LOC.env/bin/python -m pip install -e .
+  # cd ..
   cd SMQawa
   \$INSTALL_LOC.env/bin/python -m pip install -e .
   cd ..
-  \$INSTALL_LOC.env/bin/python -m pip install --upgrade 'boost_histogram >= 1.5.1'
+  \$INSTALL_LOC.env/bin/python -m pip install --upgrade 'hist >= 2.10.0' 'boost_histogram >= 1.7.1' 'mplhep >= 1.0.0'
   if [ ! -d "DCTools" ]; then
     echo "DCTools should be cloned into the directory adjacent to SMQawa to enable combine card building and postfit plotting"
     echo "e.g. git clone -b main git@github.com:yhaddad/DCTools.git for main branch"
-    echo "For current development branch, git clone -b fix-lumi-uncertainties git@github.com:NJManganelli/DCTools.git"
+    echo "For current development branch, git clone -b VZ_main git@github.com:NJManganelli/DCTools.git"
   fi
   echo "done."
 }
