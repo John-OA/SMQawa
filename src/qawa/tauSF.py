@@ -67,7 +67,7 @@ class tauIDScaleFactors:
 
         # {self.tagger}VSjet
         # sf_vsjet = self.corr_vsjet.evaluate(tau_pt,tau_dm,tau_genmatch, self.vsjet_wp, self.vse_wp, syst,"pt")
-        sf_vsjet = self.corr_vsjet.evaluate(tau_pt,tau_dm,tau_genmatch, self.vsjet_wp, "VVLoose", syst,"pt") 
+        sf_vsjet = self.corr_vsjet.evaluate(tau_pt,tau_dm,tau_genmatch, self.vsjet_wp, "VVLoose", syst,"pt") # vsjet evaluation fixed to "VVLoose" vsele ID
         sf_vsjet = ak.fill_none(sf_vsjet, 1.0)
         sf_vsjet = ak.unflatten(sf_vsjet, ntaus)
         sf_vsjet = ak.prod(sf_vsjet, axis=-1)
