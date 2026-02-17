@@ -58,7 +58,8 @@ def build_leptons(muons, electrons):
         (np.abs(muons.eta)   <  2.4 ) &
         (muons.pfRelIso04_all > 0.25) &
         muons.looseId   
-    ]
+    )
+    non_iso_muons = muons[non_iso_muons_mask]
     # select tight/loose electron
     # https://cms-talk.web.cern.ch/t/clarification-on-ee-eb-gap-veto/133256
     electron_superclusterEta = electrons.eta + electrons.deltaEtaSC
