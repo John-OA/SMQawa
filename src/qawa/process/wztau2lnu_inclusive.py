@@ -53,7 +53,7 @@ def build_leptons(muons, electrons):
         muons.looseId   
     ]
     non_iso_muons = muons[
-        ~tight_muons_mask &
+        ~tight_muons_mask & # cross-cleaning against loose-iso muons not needed, isolation inversion guarantee below
         (muons.pt            >  10. ) &
         (np.abs(muons.eta)   <  2.4 ) &
         (muons.pfRelIso04_all > 0.25) &
