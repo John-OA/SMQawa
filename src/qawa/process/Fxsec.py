@@ -126,24 +126,17 @@ def build_htaus(tau, lepton):
    
     return tau[base_selection & ~overlap_leptons]
 
-def apply_hem_uncertainty(jets, met, overlap_leptons=None):
-    if overlap_leptons is None:
-        lepton_mask = ak.ones_like(jets.pt, dtype=np.bool_)
-    else:
-        lepton_mask = ~overlap_leptons
-
+def apply_hem_uncertainty(jets, met):
+    
     phi_mask = (
         (jets.phi > -1.57) &
         (jets.phi < -0.87)
     )
-    tight_mask = (
-        lepton_mask &
-        (jets.pt > 15.0) &
-        (jets.jetId >= 6) &
-        phi_mask
-    )
-    mask_20 = tight_mask & (jets.eta > -2.5) & (jets.eta < -1.3)
-    mask_35 = tight_mask & (jets.eta > -3.0) & (jets.eta < -2.5)
+    eta_mask_20 = (jets.eta > -2.5) & (jets.eta < -1.3)
+    eta_mask_35 = (jets.eta > -3.0) & (jets.eta < -2.5)
+    
+    mask_20 = phi_mask & eta_mask_20
+    mask_35 = phi_mask & eta_mask_35
 
     scale = ak.ones_like(jets.pt)
     scale = ak.where(mask_20, 0.80, scale)
@@ -152,7 +145,7 @@ def apply_hem_uncertainty(jets, met, overlap_leptons=None):
     scaled_jets = ak.with_field(jets, jets.pt * scale, 'pt')
     scaled_jets = ak.with_field(scaled_jets, jets.mass * scale, 'mass')
 
-    delta_px = ak.sum((jets.pt - scaled_jets.pt) * np.cos(jets.phi), axis=1, mask_identity=False)
+    delta_px = ak.sum((jets.pt - scaled_jets.pt) * np.cos(jets.phi), axis=1, mask_identity=False) #delta is negative vector sum of corrected jet_pt minus old jet_pt
     delta_py = ak.sum((jets.pt - scaled_jets.pt) * np.sin(jets.phi), axis=1, mask_identity=False)
 
     met_px = met.pt * np.cos(met.phi)
@@ -666,10 +659,10 @@ class wzinclusive_processor(processor.ProcessorABC):
                 )) &
                 (np.abs(jets.eta)<2.5)
         )
-        good_jets = jets[~jet_btag & jet_mask]
+        good_jets = jets[jet_mask]
         good_bjet = jets[jet_btag & jet_mask & (np.abs(jets.eta)<2.5)]
         good_jets_forBtag = jets[jet_mask & (np.abs(jets.eta) < (2.4 if "2016" in self._era else 2.5))]
-        pu_good_jets = jets[~jet_btag & jet_mask_PUID]
+        pu_good_jets = jets[jet_mask_PUID]
 
             
         ngood_jets  = ak.num(good_jets)
@@ -1103,7 +1096,7 @@ class wzinclusive_processor(processor.ProcessorABC):
                 
         return {dataset: histos}
         
-    def process(self, event: processor.LazyDataFrame):
+    def process(self, event):
         dataset_name = event.metadata['dataset']
         is_data = event.metadata.get("is_data")
         
@@ -1203,14 +1196,7 @@ class wzinclusive_processor(processor.ProcessorABC):
         tauEnDown['mass'] = tau_mass_EnDown
         event = ak.with_field(event, tau, 'Tau')
 	
-        hem_overlap = None
-        if (self._era == '2018') and (not is_data):
-            tight_lep_for_hem, _ = build_leptons(event.Muon, event.Electron)
-            hem_overlap = ak.any(
-                event.Jet.metric_table(tight_lep_for_hem) <= 0.4,
-                axis=2
-            )
-
+        
         # define all the shifts
         shifts = [
             # Jets
@@ -1260,8 +1246,7 @@ class wzinclusive_processor(processor.ProcessorABC):
         if (self._era == '2018') and (not is_data):
             hem_jets, hem_met = apply_hem_uncertainty(
                 event.Jet,
-                event.MET,
-                overlap_leptons=hem_overlap
+                event.MET
             )
             shifts.append(({"Jet": hem_jets, "MET": hem_met}, "HEMDown"))
             shifts.append(({"Jet": event.Jet, "MET": event.MET}, "HEMUp"))
