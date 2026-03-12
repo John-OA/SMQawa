@@ -60,7 +60,7 @@ echo "----- XRD_REQUESTTIMEOUT : $XRD_REQUESTTIMEOUT"
 ls -lthr
 
 echo "----- processing the files : "
-$INSTALL_LOC_EXTERNAL/.env/bin/python3 brewer-remote-inclusive.py --jobNum=$1 --isMC={ismc} --era={era} --infile=$2 --executor={executor} --copyInput
+$INSTALL_LOC_EXTERNAL/.env/bin/python3 brewer-remote-inclusive.py --jobNum=$1 --isMC={ismc} --era={era} --analysis={analysis} --zzdd={zzdd} --infile=$2 --executor={executor} --copyInput
 
 echo "----- directory after running :"
 ls -lthr
@@ -105,6 +105,8 @@ def main():
     parser.add_argument("-i"   , "--input" , type=str, default="data.txt"       , help="input datasets", required=True)
     parser.add_argument("-t"   , "--tag"   , type=str, default="atakour"        , help="production tag", required=True)
     parser.add_argument("-isMC", "--isMC"  , type=int, default=1                , help="")
+    parser.add_argument("--zzdd"           , type=str, default="onlySR"         , help="For vbs-ZZ and/or inc-ZZ analyses DataDriven",
+                        choices=["onlySR", "DYSR", "MC"])
     parser.add_argument("-q"   , "--queue" , type=str, default="longlunch"      , help="")
     parser.add_argument("-e"   , "--era"   , type=str, default="2018"           , help="")
     parser.add_argument("-f"   , "--force" , action="store_true"                , help="recreate files and jobs")
@@ -218,9 +220,10 @@ def main():
             with open(os.path.join(jobs_dir, "script.sh"), "w") as scriptfile:
                 script = script_TEMPLATE.format(
                     proxy=proxy_copy,
-                    # ismc=options.isMC,
+                    analysis=options.analysis,
                     ismc=auto_isMC,
                     era=options.era,
+                    zzdd=options.zzdd,
                     qawa_version=qawa_version,
                     coffea_image=coffea_image,
                     full_image=full_image,
