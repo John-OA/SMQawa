@@ -63,7 +63,8 @@ def main():
     parser.add_argument('--infile'   , type=str, default=None             , help="input root file")
     parser.add_argument('--dataset'  , type=str, default=None             , help="dataset name. need to specify if file is not in EOS")
     parser.add_argument('--runperiod', type=str, default=None             , help="run period, can be auto-parse if full dataset paths are utilized")
-    parser.add_argument("--zzdd"     , type=str, default="onlySR"         , help="For vbs-ZZ and/or inc-ZZ analyses DataDriven, options: onlySR,DYSR,MC")
+    parser.add_argument("--zzdd"     , type=str, default="onlySR"         , help="For vbs-ZZ and/or inc-ZZ analyses DataDriven",
+                        choices=["onlySR", "DYSR", "MC"])
     parser.add_argument('--executor' , type=str, default="FuturesExecutor", help="Executor to use, one of IterativeExecutor (good for debugging), FuturesExecutor (multithreaded), or other coffea option")
     parser.add_argument('--copyInput', action='store_true'     , help="xrdcp a file to the worker node before executing the coffea processor on it")
     parser.add_argument('--maxChunks', '--maxchunks', type=int, default= -1, help="limit number of chunks per-file to this number at most, default '-1' to process all")
