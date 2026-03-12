@@ -36,7 +36,7 @@ def build_leptons(muons, electrons):
         (np.abs(muons.eta)    <  2.4 ) &
         (np.abs(muons.dxy)    <  0.02) &
         (np.abs(muons.dz )    <  0.1 ) &
-        (muons.pfRelIso04_all <= 0.15) & 
+        (muons.pfRelIso04_all <= 0.15) &
         muons.tightId
     )
     tight_muons = muons[tight_muons_mask]
@@ -52,9 +52,9 @@ def build_leptons(muons, electrons):
     tight_electrons_mask = (
         (electrons.pt           > 20.) &
         (((SCeta  < 2.5) &
-        (SCeta  > 1.5660)) | 
+        (SCeta  > 1.5660)) |
         (SCeta  < 1.4442)) &
-        electrons.mvaFall17V2Iso_WP90 & 
+        electrons.mvaFall17V2Iso_WP90 &
         electrons.mvaFall17V2Iso_WPL
     )
     tight_electrons = electrons[tight_electrons_mask]
@@ -68,7 +68,7 @@ def build_leptons(muons, electrons):
     tight_leptons = ak.with_name(ak.concatenate([tight_muons, tight_electrons], axis=1), 'PtEtaPhiMCandidate')
     nloose = ak.num(loose_muons) + ak.num(loose_electrons)
     
-    tight_sorted_index = ak.argsort(tight_leptons.pt,ascending=False)
+    tight_sorted_index = ak.argsort(tight_leptons.pt, ascending=False)
     tight_leptons = tight_leptons[tight_sorted_index]
 
     return tight_leptons, nloose 
@@ -76,9 +76,9 @@ def build_leptons(muons, electrons):
 def build_htaus(tau, lepton):
     print("build_htaus function using probably too-loose selections, should be re-evaluated for rejecting taus: calibration available for VTight, Tight, Medium, Loose VSjet scores (64, 32, 16, 8) but only Loose and Tight VSe scores (1==VVVLoose), which should be paired appropriately in the TauSF code")
     base = (
-        (tau.pt         > 20 ) & 
-        (np.abs(tau.eta)< 2.3 ) & 
-        (tau.decayMode != 5   ) & 
+        (tau.pt         > 20 ) &
+        (np.abs(tau.eta)< 2.3 ) &
+        (tau.decayMode != 5   ) &
         (tau.decayMode != 6   ) &
         (tau.idDeepTau2017v2p1VSe >= 2) &
         (tau.idDeepTau2017v2p1VSmu >= 1) &
@@ -89,6 +89,30 @@ def build_htaus(tau, lepton):
         axis=2
     )
     return tau[base & ~overlap_leptons]
+
+def build_jets(jets, tight_leptons, taus_loose, btag_wp, era, isAPV):
+
+    overlap_leptons = ak.any(jets.metric_table(tight_leptons) <= 0.4, axis=2)
+    overlap_taus = ak.any(jets.metric_table(taus_loose) <= 0.4, axis=2)
+
+
+    jet_mask = (
+            ~overlap_leptons &
+            ~overlap_taus &
+            (jets.pt>30.0) &
+            (np.abs(jets.eta) < 4.7) &
+            (jets.jetId >= 6) & # tight JetID 7(2016) and 6(2017/8)
+            ((jets.puId >= 6) | (jets.puId == 3) | (jets.pt >= 50)) # medium puID https://twiki.cern.ch/twiki/bin/viewauth/CMS/PileupJetIDUL 3,7 for 16and 16APV; 6,7 for 17,18
+        )
+
+    jet_btag = (
+                jets.btagDeepFlavB > btag_id(
+                    btag_wp,
+                    era + 'APV' if isAPV else era
+                )
+        ) & (np.abs(jets.eta) < (2.4 if era == "2016" else 2.5) )
+
+    return jets[jet_mask], jets[jet_mask & jet_btag]
 
 def apply_hem_uncertainty(jets, met, overlap_leptons=None):
     if overlap_leptons is None:
@@ -133,14 +157,14 @@ def apply_hem_uncertainty(jets, met, overlap_leptons=None):
 
 class zzinc_processor(processor.ProcessorABC):
     # EWK corrections process has to be define before hand, it has to change when we move to dask
-    def __init__(self, era: str ='2018', isDY=False, dd='SR',dump_gnn_array=False, ewk_process_name=None, run_period: str = ''): 
+    def __init__(self, era: str ='2018', isDY=False, dd='SR',dump_gnn_array=False, ewk_process_name=None, run_period: str = ''):
 
         self._era = era
         self._isDY = isDY
         self._ddtype = dd
         if 'APV' in self._era:
             self._isAPV = True
-            self._era = re.findall(r'\d+', self._era)[0] 
+            self._era = re.findall(r'\d+', self._era)[0]
         else:
             self._isAPV = False
         
@@ -478,95 +502,64 @@ class zzinc_processor(processor.ProcessorABC):
         )
 
 
-    def process_shift(self, event, shift_name:str=''):
-        dataset = event.metadata['dataset']
-        is_data = event.metadata.get("is_data")
+    def process_shift(self, events, shift_name:str=''):
+        dataset = events.metadata['dataset']
+        is_data = events.metadata.get("is_data")
         selection = PackedSelection()
-        weights = Weights(len(event), storeIndividual=True)
+        weights = Weights(len(events), storeIndividual=True)
         
         histos = self.build_histos()
         
         if is_data:
-            selection.add('lumimask', self._json[self._era](event.run, event.luminosityBlock))
-            selection.add('triggers', trigger_rules(event, self._triggers, self._era))
+            selection.add('lumimask', self._json[self._era](events.run, events.luminosityBlock))
+            selection.add('triggers', trigger_rules(events, self._triggers, self._era))
 
         
         # MET filters
         if "2016" in self._era:
             selection.add(
                 'metfilter',
-                #event.Flag.METFilters &
-                event.Flag.globalSuperTightHalo2016Filter & 
-                event.Flag.HBHENoiseFilter &
-                event.Flag.HBHENoiseIsoFilter & 
-                event.Flag.EcalDeadCellTriggerPrimitiveFilter &
-                event.Flag.goodVertices &
-                event.Flag.eeBadScFilter &
-                event.Flag.BadPFMuonFilter &
-                event.Flag.BadPFMuonDzFilter
+                #events.Flag.METFilters &
+                events.Flag.globalSuperTightHalo2016Filter &
+                events.Flag.HBHENoiseFilter &
+                events.Flag.HBHENoiseIsoFilter &
+                events.Flag.EcalDeadCellTriggerPrimitiveFilter &
+                events.Flag.goodVertices &
+                events.Flag.eeBadScFilter &
+                events.Flag.BadPFMuonFilter &
+                events.Flag.BadPFMuonDzFilter
             )
         else:
             selection.add(
                 'metfilter',
-                event.Flag.goodVertices &
-                event.Flag.globalSuperTightHalo2016Filter & 
-                event.Flag.HBHENoiseFilter &
-                event.Flag.HBHENoiseIsoFilter & 
-                event.Flag.EcalDeadCellTriggerPrimitiveFilter & 
-                event.Flag.BadPFMuonFilter &
-                event.Flag.BadPFMuonDzFilter &
-                event.Flag.eeBadScFilter &
-                event.Flag.ecalBadCalibFilter 
+                events.Flag.goodVertices &
+                events.Flag.globalSuperTightHalo2016Filter &
+                events.Flag.HBHENoiseFilter &
+                events.Flag.HBHENoiseIsoFilter &
+                events.Flag.EcalDeadCellTriggerPrimitiveFilter &
+                events.Flag.BadPFMuonFilter &
+                events.Flag.BadPFMuonDzFilter &
+                events.Flag.eeBadScFilter &
+                events.Flag.ecalBadCalibFilter
             )
 
 
         tight_lep, nloose_lep = build_leptons(
-            event.Muon,
-            event.Electron
+            events.Muon,
+            events.Electron
         )
         
-        had_taus = build_htaus(event.Tau, tight_lep)
+        had_taus = build_htaus(events.Tau, tight_lep)
         ntight_lep = ak.num(tight_lep)
         nhtaus_lep = ak.num(had_taus)
-        jets = event.Jet
-
-        overlap_leptons = ak.any(
-            jets.metric_table(tight_lep) <= 0.4,
-            axis=2
-        )
-
-        jet_mask = (
-            ~overlap_leptons & 
-            (jets.pt>30.0) & 
-            (np.abs(jets.eta) < 4.7) &
-            (jets.jetId >= 6) &   # tight JetID 7(2016) and 6(2017/8)
-            ((jets.puId >= 6) | (jets.puId == 3) | (jets.pt >= 50)) # medium puID https://twiki.cern.ch/twiki/bin/viewauth/CMS/PileupJetIDUL 3,7 for 16and 16APV; 6,7 for 17,18
-        )
-
-        jet_mask_PUID = (
-            ~overlap_leptons & 
-            (jets.pt>30.0) & 
-            (np.abs(jets.eta) < 4.7) & 
-            (jets.jetId >= 6) # tight JetID 7(2016) and 6(2017/8)
-        )
-        
-        jet_btag = (
-            (event.Jet.btagDeepFlavB > btag_id(
-                self.btag_wp,
-                self._era + 'APV' if self._isAPV else self._era
-            )) &
-            (np.abs(jets.eta) < (2.4 if "2016" in self._era else 2.5))
-        )
-        good_jets = jets[~jet_btag & jet_mask]
-
-        good_bjet = jets[jet_btag & jet_mask]
-        good_jets_forBtag = jets[jet_mask & (np.abs(jets.eta) < (2.4 if "2016" in self._era else 2.5))]
-        pu_good_jets = jets[~jet_btag & jet_mask_PUID]
+        good_jets, good_bjets = build_jets(eventss.Jet, tight_lep, had_taus, self.btag_wp, self._era, self._isAPV)
+        sorted_jet_indices, sorted_bjet_indices = ak.argsort(good_jets.pt, ascending=False), ak.argsort(good_bjets.pt, ascending=False)
+        good_jets, good_bjets = good_jets[sorted_jet_indices], good_bjets[sorted_bjet_indices]
 
         ngood_jets  = ak.num(good_jets)
-        ngood_bjets = ak.num(good_bjet)
-        event['ngood_bjets'] = ngood_bjets
-        event['ngood_jets']  = ngood_jets
+        ngood_bjets = ak.num(good_bjets)
+        events['ngood_bjets'] = ngood_bjets
+        events['ngood_jets']  = ngood_jets
            
        
         # lepton quantities
@@ -582,8 +575,8 @@ class zzinc_processor(processor.ProcessorABC):
             return pair[cand], extra_lepton, cand
         
         dilep, extra_lep, z_cand_mask = z_lepton_pair(tight_lep)
-        lead_lep = ak.firsts(dilep.l1,axis=1)
-        subl_lep = ak.firsts(dilep.l2,axis=1)
+        lead_lep = ak.firsts(dilep.l1, axis=1)
+        subl_lep = ak.firsts(dilep.l2, axis=1)
         dilep_p4 = (lead_lep + subl_lep)
         dilep_m  = dilep_p4.mass
         dilep_pt = dilep_p4.pt
@@ -592,11 +585,11 @@ class zzinc_processor(processor.ProcessorABC):
         # high level observables
         p4_met = ak.zip(
             {
-                "pt": event.MET.pt,
-                "eta": ak.zeros_like(event.MET.pt),
-                "phi": event.MET.phi,
-                "mass": ak.zeros_like(event.MET.pt),
-                "charge": ak.zeros_like(event.MET.pt),
+                "pt": events.MET.pt,
+                "eta": ak.zeros_like(events.MET.pt),
+                "phi": events.MET.phi,
+                "mass": ak.zeros_like(events.MET.pt),
+                "charge": ak.zeros_like(events.MET.pt),
             },
             with_name="PtEtaPhiMCandidate",
             behavior=candidate.behavior,
@@ -607,19 +600,9 @@ class zzinc_processor(processor.ProcessorABC):
         reco_met_pt = ak.where(ntight_lep==2, p4_met.pt, emu_met.pt)
         reco_met_phi = ak.where(ntight_lep==2, p4_met.phi, emu_met.phi)
 
-        ptmiss_sigma = event.MET.significance
+        ptmiss_sigma = events.MET.significance
         
-        # met_px = reco_met_pt * np.cos(reco_met_phi)
-        # met_py = reco_met_pt * np.sin(reco_met_phi)
-
-        # numerator = (
-        #     met_px**2 * event.MET.covXX +
-        #     2 * met_px * met_py * event.MET.covXY +
-        #     met_py**2 * event.MET.covYY
-        # )
-        # ptmiss_unc = np.sqrt(numerator / (reco_met_pt**2))
-	    
-	    # this definition is not correct as it doesn't include the mass of the second Z
+	# this definition is not correct as it doesn't include the mass of the second Z
         dilep_et_ll = np.sqrt(dilep_pt**2 + dilep_m**2)
         dilep_et_met = np.sqrt(reco_met_pt**2 + self.zmass**2)
         
@@ -633,8 +616,6 @@ class zzinc_processor(processor.ProcessorABC):
         dilep_dphi_met  = ak.where(ntight_lep==2, dilep_p4.delta_phi(p4_met), dilep_p4.delta_phi(emu_met))
 
         # 2jet and vbs related variables
-        sorted_indices = np.argsort(-good_jets.pt)
-        good_jets = good_jets[sorted_indices]
         
         lead_jet = ak.firsts(good_jets)
         subl_jet = ak.firsts(good_jets[lead_jet.delta_r(good_jets)>0.01])
@@ -642,13 +623,13 @@ class zzinc_processor(processor.ProcessorABC):
 
         leadbjet_score = lead_jet.btagDeepFlavB
         sublbjet_score = subl_jet.btagDeepFlavB
-        event['leadbjet_score'] = ak.fill_none(leadbjet_score,np.nan)
-        event['sublbjet_score'] = ak.fill_none(sublbjet_score,np.nan)
+        events['leadbjet_score'] = ak.fill_none(leadbjet_score, np.nan)
+        events['sublbjet_score'] = ak.fill_none(sublbjet_score, np.nan)
         
         dijet_mass = (lead_jet + subl_jet).mass
         dijet_deta = np.abs(lead_jet.eta - subl_jet.eta)
-        event['dijet_mass'] = dijet_mass
-        event['dijet_deta'] = dijet_deta 
+        events['dijet_mass'] = dijet_mass
+        events['dijet_deta'] = dijet_deta
         
         min_dphi_met_j = ak.min(np.abs(good_jets.delta_phi(p4_met)),axis=1)
 
@@ -659,7 +640,7 @@ class zzinc_processor(processor.ProcessorABC):
             (ak.any(tight_lep.pt > 20)) &
             ak.fill_none((lead_lep.pdgId + subl_lep.pdgId)==0, False)
         )
-        
+
         selection.add(
             "require-osof",
             (ntight_lep==2) & (nloose_lep==0) &
@@ -696,7 +677,7 @@ class zzinc_processor(processor.ProcessorABC):
         selection.add("dilep_dphi_met", ak.fill_none(np.abs(dilep_dphi_met)>1.0, False))
         selection.add("min_dphi_met_j",ak.fill_none(np.abs(min_dphi_met_j)>0.5, False))
         # jet demography
-        # selection.add('1njets' , ngood_jets  >= 1 )
+        # Task: add selections for 0 and 1 jets exclusively
         selection.add('2njets' , ngood_jets  >= 2 )
         selection.add('1nbjets', ngood_bjets >= 1 )
         selection.add('0nhtaus', nhtaus_lep  == 0 )
@@ -706,44 +687,44 @@ class zzinc_processor(processor.ProcessorABC):
         selection.add('dijet_mass_400_low' , ak.fill_none(dijet_mass <  400, False))
 
         # Define all variables for the GNN
-        event['met_sig'  ] = ak.fill_none(ptmiss_sigma,np.nan)
-        # event['met_uncertainty'  ] = ak.fill_none(ptmiss_unc,np.nan)
-        event['met_pt'  ] = ak.fill_none(reco_met_pt,np.nan)
-        event['met_phi' ] = ak.fill_none(reco_met_phi,np.nan)
-        event['dilep_mt'] = ak.fill_none(dilep_mt,np.nan)
-        event['dilep_m'] = ak.fill_none(dilep_m,np.nan)
-        event['dilep_pt'] = ak.fill_none(dilep_pt,np.nan)
-        event['njets'   ] = ak.fill_none(ngood_jets,np.nan)
-        event['bjets'   ] = ak.fill_none(ngood_bjets,np.nan)
-        event['dphi_met_ll'] = ak.fill_none(dilep_dphi_met,np.nan)
-        event['dijet_mass'] = ak.fill_none(dijet_mass,np.nan)
-        event['dijet_deta'] = ak.fill_none(dijet_deta,np.nan)
-        event['min_dphi_met_j'] = ak.fill_none(min_dphi_met_j,np.nan)
+        events['met_sig'  ] = ak.fill_none(ptmiss_sigma, np.nan)
+        # events['met_uncertainty'  ] = ak.fill_none(ptmiss_unc, np.nan)
+        events['met_pt'  ] = ak.fill_none(reco_met_pt, np.nan)
+        events['met_phi' ] = ak.fill_none(reco_met_phi, np.nan)
+        events['dilep_mt'] = ak.fill_none(dilep_mt, np.nan)
+        events['dilep_m'] = ak.fill_none(dilep_m, np.nan)
+        events['dilep_pt'] = ak.fill_none(dilep_pt, np.nan)
+        events['njets'   ] = ak.fill_none(ngood_jets, np.nan)
+        events['bjets'   ] = ak.fill_none(ngood_bjets, np.nan)
+        events['dphi_met_ll'] = ak.fill_none(dilep_dphi_met, np.nan)
+        events['dijet_mass'] = ak.fill_none(dijet_mass, np.nan)
+        events['dijet_deta'] = ak.fill_none(dijet_deta, np.nan)
+        events['min_dphi_met_j'] = ak.fill_none(min_dphi_met_j, np.nan)
 
-        event['leading_lep_pt'  ] = ak.fill_none(lead_lep.pt,np.nan)
-        event['leading_lep_pdgId' ] = ak.fill_none(lead_lep.pdgId,np.nan)
-        event['leading_lep_eta' ] = ak.fill_none(lead_lep.eta,np.nan)
-        event['leading_lep_phi' ] = ak.fill_none(lead_lep.phi,np.nan)
-        event['trailing_lep_pt' ] = ak.fill_none(subl_lep.pt,np.nan)
-        event['trailing_lep_eta'] = ak.fill_none(subl_lep.eta,np.nan)
-        event['trailing_lep_phi'] = ak.fill_none(subl_lep.phi,np.nan)
-        event['third_lep_pt'  ] = ak.fill_none(third_lep.pt,np.nan)
-        event['third_lep_eta' ] = ak.fill_none(third_lep.eta,np.nan)
-        event['third_lep_phi' ] = ak.fill_none(third_lep.phi,np.nan)
-        event['lead_jet_pt'  ] = ak.fill_none(lead_jet.pt,np.nan)
-        event['lead_jet_eta' ] = ak.fill_none(lead_jet.eta,np.nan)
-        event['lead_jet_phi' ] = ak.fill_none(lead_jet.phi,np.nan)
-        event['trail_jet_pt' ] = ak.fill_none(subl_jet.pt,np.nan)
-        event['trail_jet_eta'] = ak.fill_none(subl_jet.eta,np.nan)
-        event['trail_jet_phi'] = ak.fill_none(subl_jet.phi,np.nan)
-        event['third_jet_pt' ] = ak.fill_none(third_jet.pt,np.nan)
-        event['third_jet_eta'] = ak.fill_none(third_jet.eta,np.nan)
-        event['third_jet_phi'] = ak.fill_none(third_jet.phi,np.nan)
+        events['leading_lep_pt'  ] = ak.fill_none(lead_lep.pt, np.nan)
+        events['leading_lep_pdgId' ] = ak.fill_none(lead_lep.pdgId, np.nan)
+        events['leading_lep_eta' ] = ak.fill_none(lead_lep.eta, np.nan)
+        events['leading_lep_phi' ] = ak.fill_none(lead_lep.phi, np.nan)
+        events['trailing_lep_pt' ] = ak.fill_none(subl_lep.pt, np.nan)
+        events['trailing_lep_eta'] = ak.fill_none(subl_lep.eta, np.nan)
+        events['trailing_lep_phi'] = ak.fill_none(subl_lep.phi, np.nan)
+        events['third_lep_pt'  ] = ak.fill_none(third_lep.pt, np.nan)
+        events['third_lep_eta' ] = ak.fill_none(third_lep.eta, np.nan)
+        events['third_lep_phi' ] = ak.fill_none(third_lep.phi, np.nan)
+        events['lead_jet_pt'  ] = ak.fill_none(lead_jet.pt, np.nan)
+        events['lead_jet_eta' ] = ak.fill_none(lead_jet.eta, np.nan)
+        events['lead_jet_phi' ] = ak.fill_none(lead_jet.phi, np.nan)
+        events['trail_jet_pt' ] = ak.fill_none(subl_jet.pt, np.nan)
+        events['trail_jet_eta'] = ak.fill_none(subl_jet.eta, np.nan)
+        events['trail_jet_phi'] = ak.fill_none(subl_jet.phi, np.nan)
+        events['third_jet_pt' ] = ak.fill_none(third_jet.pt, np.nan)
+        events['third_jet_eta'] = ak.fill_none(third_jet.eta, np.nan)
+        events['third_jet_phi'] = ak.fill_none(third_jet.phi, np.nan)
         
-        # Apply GNN event['gnn_score'] = applyGNN(event,self._era).get_nnscore()
-        # event['gnn_score'] = applyGNN(event).get_nnscore()
+        # Apply GNN events['gnn_score'] = applyGNN(events,self._era).get_nnscore()
+        # events['gnn_score'] = applyGNN(events).get_nnscore()
         # score_for_flat = np.minimum(
-        #     np.maximum(event['gnn_score'], self._gnn_score_min),
+        #     np.maximum(events['gnn_score'], self._gnn_score_min),
         #     self._gnn_score_max,
         # )
         # raw_score = self.gnn_flat_fnc(score_for_flat)
@@ -753,7 +734,7 @@ class zzinc_processor(processor.ProcessorABC):
         #     posinf=self._gnn_flat_max,
         #     neginf=self._gnn_flat_min,
         # )
-        # event['gnn_flat'] = np.minimum(
+        # events['gnn_flat'] = np.minimum(
         #     np.maximum(raw_score, self._gnn_flat_min),
         #     self._gnn_flat_max,
         # )
@@ -761,11 +742,11 @@ class zzinc_processor(processor.ProcessorABC):
 
         # Now adding weights
         if not is_data:
-            weights.add('genweight', event.genWeight)
-            self._btag.append_btag_sf(good_jets_forBtag, weights)#good_jets_forBtag
-            self._jpSF.append_jetPU_sf(pu_good_jets, weights)
+            weights.add('genweight', events.genWeight)
+            self._btag.append_btag_sf(good_jets, weights) #Always tag all jets selected, both b-tagged and not-b-tagged
+            self._jpSF.append_jetPU_sf(good_jets, weights) #Always apply SFs for all good jets
 
-            self._purw.append_pileup_weight(weights, event.Pileup.nTrueInt)
+            self._purw.append_pileup_weight(weights, events.Pileup.nTrueInt)
             self._tauID.append_tauID_sf(had_taus, weights)
             self._add_trigger_sf(weights, lead_lep, subl_lep)
     
@@ -778,72 +759,74 @@ class zzinc_processor(processor.ProcessorABC):
             _ones = np.ones(len(weights.weight()))
             if self.ewk_process_name:
                 self.ewk_corr.get_weight(
-                        event.GenPart,
-                        event.Generator.x1,
-                        event.Generator.x2,
+                        events.GenPart,
+                        events.Generator.x1,
+                        events.Generator.x2,
                         weights
                 )
             else:
                 weights.add("kEW", _ones, _ones, _ones)
-            if "PSWeight" in event.fields:
-                theory_ps_weight(weights, event.PSWeight)
+            if "PSWeight" in events.fields:
+                theory_ps_weight(weights, events.PSWeight)
             else:
                 theory_ps_weight(weights, None)
 
-            if "LHEPdfWeight" in event.fields:
-                theory_pdf_weight(weights, event.LHEPdfWeight)
+            if "LHEPdfWeight" in events.fields:
+                theory_pdf_weight(weights, events.LHEPdfWeight)
             else:
                 theory_pdf_weight(weights, None)
 
-            if ('LHEScaleWeight' in event.fields) and (len(event.LHEScaleWeight[0]) > 0):
-                if len(event.LHEScaleWeight[0]) == 9:
-                    weights.add('QCDScale0w'  , _ones, event.LHEScaleWeight[:, 1], event.LHEScaleWeight[:, 7])
-                    weights.add('QCDScale1w'  , _ones, event.LHEScaleWeight[:, 3], event.LHEScaleWeight[:, 5])
-                    weights.add('QCDScale2w'  , _ones, event.LHEScaleWeight[:, 0], event.LHEScaleWeight[:, 8])
-                elif len(event.LHEScaleWeight[0]) == 8:
-                    weights.add('QCDScale0w'  , _ones, event.LHEScaleWeight[:, 1], event.LHEScaleWeight[:, 6])
-                    weights.add('QCDScale1w'  , _ones, event.LHEScaleWeight[:, 3], event.LHEScaleWeight[:, 4])
-                    weights.add('QCDScale2w'  , _ones, event.LHEScaleWeight[:, 0], event.LHEScaleWeight[:, 7])
-                elif len(event.LHEScaleWeight[0]) == 18:
-                    weights.add('QCDScale0w'  , _ones, event.LHEScaleWeight[:, 2], event.LHEScaleWeight[:, 14])
-                    weights.add('QCDScale1w'  , _ones, event.LHEScaleWeight[:, 6], event.LHEScaleWeight[:, 10])
-                    weights.add('QCDScale2w'  , _ones, event.LHEScaleWeight[:, 0], event.LHEScaleWeight[:, 16])
+            if ('LHEScaleWeight' in events.fields) and (len(events.LHEScaleWeight[0]) > 0):
+                if len(events.LHEScaleWeight[0]) == 9:
+                    weights.add('QCDScale0w'  , _ones, events.LHEScaleWeight[:, 1], events.LHEScaleWeight[:, 7])
+                    weights.add('QCDScale1w'  , _ones, events.LHEScaleWeight[:, 3], events.LHEScaleWeight[:, 5])
+                    weights.add('QCDScale2w'  , _ones, events.LHEScaleWeight[:, 0], events.LHEScaleWeight[:, 8])
+                elif len(events.LHEScaleWeight[0]) == 8:
+                    weights.add('QCDScale0w'  , _ones, events.LHEScaleWeight[:, 1], events.LHEScaleWeight[:, 6])
+                    weights.add('QCDScale1w'  , _ones, events.LHEScaleWeight[:, 3], events.LHEScaleWeight[:, 4])
+                    weights.add('QCDScale2w'  , _ones, events.LHEScaleWeight[:, 0], events.LHEScaleWeight[:, 7])
+                elif len(events.LHEScaleWeight[0]) == 18:
+                    weights.add('QCDScale0w'  , _ones, events.LHEScaleWeight[:, 2], events.LHEScaleWeight[:, 14])
+                    weights.add('QCDScale1w'  , _ones, events.LHEScaleWeight[:, 6], events.LHEScaleWeight[:, 10])
+                    weights.add('QCDScale2w'  , _ones, events.LHEScaleWeight[:, 0], events.LHEScaleWeight[:, 16])
                 else:
                     print("WARNING: QCD scale variation type not recongnised ... ")
                 
-            # if 'LHEReweightingWeight' in event.fields and 'aQGC' in dataset:
+            # if 'LHEReweightingWeight' in events.fields and 'aQGC' in dataset:
             #     for i in range(1057):
-            #         weights.add(f"eft_{self._eftnames[i]}", _ones, event.LHEReweightingWeight[:, i])
+            #         weights.add(f"eft_{self._eftnames[i]}", _ones, events.LHEReweightingWeight[:, i])
             # print(weights.weight(),'\n')
             # 2017 Prefiring correction weight
-            if 'L1PreFiringWeight' in event.fields:
-                weights.add("prefiring_weight", event.L1PreFiringWeight.Nom, event.L1PreFiringWeight.Dn, event.L1PreFiringWeight.Up)
+            if 'L1PreFiringWeight' in events.fields:
+                weights.add("prefiring_weight", events.L1PreFiringWeight.Nom, events.L1PreFiringWeight.Dn, events.L1PreFiringWeight.Up)
             
 
         # selections
         if is_data:
+            # FIXME: cannot be that triggers are not applied in MonteCarlo...
             common_sel = ['triggers', 'lumimask', 'metfilter']
         else:
             common_sel = ['metfilter']
         channels = {
-           # vector boson scattering
+            # Task: add regions selecting for inclusive ZZ events
+            # vector boson scattering
             "vbs-SR": common_sel + [
-            'require-ossf', "2njets",
-            'dilep_m', 'dilep_pt', '0nhtaus',
-            'dilep_dphi_met', 'min_dphi_met_j', 'met_pt', '~1nbjets', 
-            "dijet_deta", "dijet_mass_400"
-        ],
+                'require-ossf', "2njets",
+                'dilep_m', 'dilep_pt', '0nhtaus',
+                'dilep_dphi_met', 'min_dphi_met_j', 'met_pt', '~1nbjets',
+                "dijet_deta", "dijet_mass_400"
+            ],
             "vbs-3L": common_sel + [
-            'require-3lep', 'dilep_m', 'dilep_pt','0nhtaus',
-            'dilep_dphi_met', #'min_dphi_met_j',
-            'medium_ptmiss', '~1nbjets', "2njets"
+                'require-3lep', 'dilep_m', 'dilep_pt','0nhtaus',
+                'dilep_dphi_met', #'min_dphi_met_j',
+                'medium_ptmiss', '~1nbjets', "2njets"
             ],
             "vbs-EM": common_sel + [
-            'require-osof',
-            'dilep_m', 'dilep_pt', 
-            'dilep_dphi_met', #'min_dphi_met_j',
-            'medium_ptmiss', '~1nbjets','0nhtaus',
-            "2njets"
+                'require-osof',
+                'dilep_m', 'dilep_pt',
+                'dilep_dphi_met', #'min_dphi_met_j',
+                'medium_ptmiss', '~1nbjets','0nhtaus',
+                "2njets"
             ],
         }
 
@@ -880,7 +863,7 @@ class zzinc_processor(processor.ProcessorABC):
             cut =  selection.require(**sel_args_)
                 
             systname = 'nominal' if syst is None else syst
-            if _weight is None: 
+            if _weight is None:
                 if syst in weights.variations:
                     weight = weights.weight(modifier=syst)[cut]
                 else:
@@ -893,11 +876,11 @@ class zzinc_processor(processor.ProcessorABC):
                 print(f" - {syst} weight nan/inf:", vv[np.isnan(vv)], vv[np.isinf(vv)])
             histos[var].fill(
                 **{
-                    "channel": ch, 
-                    "systematic": systname, 
-                    var: _format_variable(event[var], cut), 
+                    "channel": ch,
+                    "systematic": systname,
+                    var: _format_variable(events[var], cut),
                     "weight": ak.nan_to_num(weight,nan=1, posinf=1, neginf=1)
-                        #ak.ones_like(weight)
+                    #ak.ones_like(weight)
                 }
             )
             
@@ -913,11 +896,11 @@ class zzinc_processor(processor.ProcessorABC):
 
             _dicv = {
                 ch: {
-                    "event": _format_variable(event.event, cut).tolist(), 
-                    # "gnn": _format_variable(event["gnn_score"], cut).tolist(), 
+                    "events": _format_variable(events.event, cut).tolist(),
+                    # "gnn": _format_variable(events["gnn_score"], cut).tolist(),
                     "jet_pt": jet_pts,
-                    "lepton_pt": _format_variable(event['leading_lep_pt'], cut).tolist(), 
-                    "lepton_pdgId" : _format_variable(event['leading_lep_pdgId'], cut).tolist(), 
+                    "lepton_pt": _format_variable(events['leading_lep_pt'], cut).tolist(),
+                    "lepton_pdgId" : _format_variable(events['leading_lep_pdgId'], cut).tolist(),
                     "weight": weight.tolist()
                 }
             }
@@ -968,69 +951,49 @@ class zzinc_processor(processor.ProcessorABC):
                 _histogram_filler(ch, sys,  'third_lep_phi') 
         return {dataset: histos}
         
-    def process(self, event: processor.LazyDataFrame):
-        dataset_name = event.metadata['dataset']
-        is_data = event.metadata.get("is_data")
+    def process(self, events: processor.LazyDataFrame):
+        dataset_name = events.metadata['dataset']
+        is_data = events.metadata.get("is_data")
 
+        # JES/JER corrections
+        cache = {}
 
-        if is_data: 
-            softjet_gen_pt = None
-        else:
-            softjet_gen_pt = find_best_match(event.CorrT1METJet,event.GenJet)
         
-        rho = event.fixedGridRhoFastjetAll
-        cache = event.caches[0]
+        raw_met = events.RawMET
+        met_to_correct = events.MET
 
-        if not is_data:
-            jets = self._jmeu.corrected_jets_jer(event.Jet, rho, event.caches[0])
-            event = ak.with_field(event, jets, 'Jet')
-            jets_shift_L123 = self._jmeu.corrected_jets_L123(event.Jet, rho, cache)
-        else:
-            jets = event.Jet
-            emFraction = jets.chEmEF + jets.neEmEF
-            mask_jec = (jets.pt > 15) & (emFraction <= 0.9)
-            jets_shift_L123 = ak.mask(jets,mask_jec)
-            jets_shift_L123["pt"] = jets_shift_L123.pt * (1 - jets.muonSubtrFactor)
+        jets = self._jmeu.corrected_jets_L123_JER(events.Jet, events.fixedGridRhoFastjetAll, cache)
+        # jets_to_correct_met = self._jmeu.corrected_jets_L123_noJER(events.Jet, events.fixedGridRhoFastjetAll, cache)
+        met = self._jmeu.corrected_met(met_to_correct, jets, events.fixedGridRhoFastjetAll, cache) # we are adding fully smeared L123 jets
 
-        jets_shift_L1 = self._jmeu.corrected_jets_L1(event.Jet, rho, cache)
-
-        softjets_shift_L123 = self._jmeu.corrected_jets_L123(event.CorrT1METJet, rho, cache, softjet_gen_pt)
-        softjets_shift_L1 = self._jmeu.corrected_jets_L1(event.CorrT1METJet, rho, cache, softjet_gen_pt)
-        jets_col_shift_L123 = ak.concatenate([jets_shift_L123, softjets_shift_L123],axis=1)
-        jets_col_shift_L1 = ak.concatenate([jets_shift_L1, softjets_shift_L1],axis=1)
-            
-        
-        raw_met = event.RawMET
-        met_to_correct = event.MET
-        met_to_correct["pt"] = raw_met.pt
-        met_to_correct["phi"] = raw_met.phi
-        met = self._jmeu.corrected_met(met_to_correct, jets_col_shift_L123, jets_col_shift_L1, rho, event.caches[0])
+        events = ak.with_field(events, events.Jet, 'OrigJet')
+        events = ak.with_field(events, events.MET, 'OrigMET')
+        events = ak.with_field(events, jets, 'Jet')
+        events = ak.with_field(events, jets_to_correct_met, 'JetforMET')
+        events = ak.with_field(events, met, 'MET')
 
         # x-y met shit corrections
 
-        run = event.run 
-        npv = event.PV.npvs
-        
         met = met_phi_xy_correction(
-            met, run, npv, 
+            met, events.run, events.PV.npvs, 
             is_mc=not is_data, 
             era=self._era
         )
-        event = ak.with_field(event, met, 'MET')
+        events = ak.with_field(events, met, 'MET')
 
         if is_data:
             
             # Apply rochester_correction
-            muon = event.Muon 
+            muon = events.Muon 
             muon_pt,muon_pt_roccorUp,muon_pt_roccorDown=rochester_correction(is_data).apply_rochester_correction (muon)
             muon['pt'] = muon_pt
-            event = ak.with_field(event, muon, 'Muon')
+            events = ak.with_field(events, muon, 'Muon')
             
-            return self.process_shift(event, None)
+            return self.process_shift(events, None)
 
         # Adding scale factors to Muon and Electron fields
-        muon = event.Muon 
-        electron = event.Electron
+        muon = events.Muon 
+        electron = events.Electron
         muonSF_nom, muonSF_up, muonSF_down = self._leSF.muonSF(muon)
         elecSF_nom, elecSF_up, elecSF_down = self._leSF.electronSF(electron)
         
@@ -1042,39 +1005,39 @@ class zzinc_processor(processor.ProcessorABC):
         electron['SF_up'] = elecSF_up
         electron['SF_down'] = elecSF_down
 
-        event = ak.with_field(event, muon, 'Muon')
-        event = ak.with_field(event, electron, 'Electron')
+        events = ak.with_field(events, muon, 'Muon')
+        events = ak.with_field(events, electron, 'Electron')
 
         # Apply rochester_correction
-        muon=event.Muon
-        muonEnUp=event.Muon
-        muonEnDown=event.Muon
+        muon=events.Muon
+        muonEnUp=events.Muon
+        muonEnDown=events.Muon
         muon_pt,muon_pt_roccorUp,muon_pt_roccorDown=rochester_correction(is_data).apply_rochester_correction (muon)
         
         muon['pt'] = muon_pt
         muonEnUp['pt'] = muon_pt_roccorUp
         muonEnDown['pt'] = muon_pt_roccorDown
-        event = ak.with_field(event, muon, 'Muon')
+        events = ak.with_field(events, muon, 'Muon')
         
         # Electron corrections
-        electronEnUp=event.Electron
-        electronEnDown=event.Electron
+        electronEnUp=events.Electron
+        electronEnDown=events.Electron
 
-        electronEnUp  ['pt'] = event.Electron['pt'] + event.Electron.energyErr/np.cosh(event.Electron.eta)
-        electronEnDown['pt'] = event.Electron['pt'] - event.Electron.energyErr/np.cosh(event.Electron.eta)	
+        electronEnUp  ['pt'] = events.Electron['pt'] + events.Electron.energyErr/np.cosh(events.Electron.eta)
+        electronEnDown['pt'] = events.Electron['pt'] - events.Electron.energyErr/np.cosh(events.Electron.eta)
 	
         hem_overlap = None
         if (self._era == '2018') and (not is_data):
-            tight_lep_for_hem, _ = build_leptons(event.Muon, event.Electron)
+            tight_lep_for_hem, _ = build_leptons(events.Muon, events.Electron)
             hem_overlap = ak.any(
-                event.Jet.metric_table(tight_lep_for_hem) <= 0.4,
+                events.Jet.metric_table(tight_lep_for_hem) <= 0.4,
                 axis=2
             )
 
         # define all the shifts
         shifts = [
             # Jets
-            ({"Jet": event.Jet                             , "MET": event.MET                               }, None                  ),
+            ({"Jet": events.Jet                             , "MET": events.MET                               }, None                  ),
             ({"Jet": jets.JES_Total.up                , "MET": met.JES_Total.up                  }, "JESUp"               ),
             ({"Jet": jets.JES_Total.down              , "MET": met.JES_Total.down                }, "JESDown"             ),
             ({"Jet": jets.JES_Absolute.up             , "MET": met.JES_Absolute.up               }, "JES_AbsoluteUp"      ),
@@ -1116,16 +1079,16 @@ class zzinc_processor(processor.ProcessorABC):
 
         if (self._era == '2018') and (not is_data):
             hem_jets, hem_met = apply_hem_uncertainty(
-                event.Jet,
-                event.MET,
+                events.Jet,
+                events.MET,
                 overlap_leptons=hem_overlap
             )
             shifts.append(({"Jet": hem_jets, "MET": hem_met}, "HEMDown"))
-            shifts.append(({"Jet": event.Jet, "MET": event.MET}, "HEMUp"))
+            shifts.append(({"Jet": events.Jet, "MET": events.MET}, "HEMUp"))
         
         shifts = [
             self.process_shift(
-                update_collection(event, collections), 
+                update_collection(events, collections), 
                 name
             ) for collections, name in shifts
         ]
@@ -1152,10 +1115,10 @@ class zzinc_processor(processor.ProcessorABC):
 #         ewk_process_name="ZZ",
 #         run_period='',
 #         dump_gnn_array=False),
-#     treename='Events',
+#     treename='Eventss',
 #     executor=processor.futures_executor,
 #     executor_args={
-#         "schema": nanoevents.NanoAODSchema,
+#         "schema": nanoeventss.NanoAODSchema,
 #         "workers": 16
 #     },
 #     # chunksize=200,
