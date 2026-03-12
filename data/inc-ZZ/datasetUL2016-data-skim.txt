@@ -1,0 +1,15 @@
+/DoubleEG_Run2016F-UL2016_MiniAODv2_NanoAODv9-v1
+/DoubleEG_Run2016G-UL2016_MiniAODv2_NanoAODv9-v1
+/DoubleEG_Run2016H-UL2016_MiniAODv2_NanoAODv9-v1
+/DoubleMuon_Run2016F-UL2016_MiniAODv2_NanoAODv9-v1
+/DoubleMuon_Run2016G-UL2016_MiniAODv2_NanoAODv9-v2
+/DoubleMuon_Run2016H-UL2016_MiniAODv2_NanoAODv9-v1
+/SingleElectron_Run2016F-UL2016_MiniAODv2_NanoAODv9-v1
+/SingleElectron_Run2016G-UL2016_MiniAODv2_NanoAODv9-v1
+/SingleElectron_Run2016H-UL2016_MiniAODv2_NanoAODv9-v1
+/SingleMuon_Run2016F-UL2016_MiniAODv2_NanoAODv9-v1
+/SingleMuon_Run2016G-UL2016_MiniAODv2_NanoAODv9-v1
+/SingleMuon_Run2016H-UL2016_MiniAODv2_NanoAODv9-v1
+/MuonEG_Run2016F-UL2016_MiniAODv2_NanoAODv9-v1
+/MuonEG_Run2016G-UL2016_MiniAODv2_NanoAODv9-v1
+/MuonEG_Run2016H-UL2016_MiniAODv2_NanoAODv9-v1
