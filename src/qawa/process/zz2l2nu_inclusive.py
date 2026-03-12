@@ -20,14 +20,14 @@ from coffea.analysis_tools import Weights, PackedSelection
 from coffea.lumi_tools import LumiMask
 
 from qawa.roccor import rochester_correction
-from qawa.applyGNN_old import applyGNN
+# from qawa.applyGNN_old import applyGNN
 from qawa.leptonsSF import LeptonScaleFactors
 from qawa.jetPU import jetPUScaleFactors
 from qawa.tauSF import tauIDScaleFactors
 from qawa.btag import BTVCorrector, btag_id
-from qawa.jme_gh import JMEUncertainty, update_collection
+from qawa.jme import JMEUncertainty, update_collection
 from qawa.gen_match import delta_r2, find_best_match
-from qawa.ddr_SR import dataDrivenDYRatio
+# from qawa.ddr_SR import dataDrivenDYRatio
 from qawa.common import pileup_weights, ewk_corrector, met_phi_xy_correction, theory_ps_weight, theory_pdf_weight, trigger_rules
 
 def build_leptons(muons, electrons):
@@ -741,22 +741,22 @@ class zzinc_processor(processor.ProcessorABC):
         event['third_jet_phi'] = ak.fill_none(third_jet.phi,np.nan)
         
         # Apply GNN event['gnn_score'] = applyGNN(event,self._era).get_nnscore()
-        event['gnn_score'] = applyGNN(event).get_nnscore()
-        score_for_flat = np.minimum(
-            np.maximum(event['gnn_score'], self._gnn_score_min),
-            self._gnn_score_max,
-        )
-        raw_score = self.gnn_flat_fnc(score_for_flat)
-        raw_score = np.nan_to_num(
-            raw_score,
-            nan=self._gnn_flat_min,
-            posinf=self._gnn_flat_max,
-            neginf=self._gnn_flat_min,
-        )
-        event['gnn_flat'] = np.minimum(
-            np.maximum(raw_score, self._gnn_flat_min),
-            self._gnn_flat_max,
-        )
+        # event['gnn_score'] = applyGNN(event).get_nnscore()
+        # score_for_flat = np.minimum(
+        #     np.maximum(event['gnn_score'], self._gnn_score_min),
+        #     self._gnn_score_max,
+        # )
+        # raw_score = self.gnn_flat_fnc(score_for_flat)
+        # raw_score = np.nan_to_num(
+        #     raw_score,
+        #     nan=self._gnn_flat_min,
+        #     posinf=self._gnn_flat_max,
+        #     neginf=self._gnn_flat_min,
+        # )
+        # event['gnn_flat'] = np.minimum(
+        #     np.maximum(raw_score, self._gnn_flat_min),
+        #     self._gnn_flat_max,
+        # )
 
 
         # Now adding weights
@@ -946,8 +946,8 @@ class zzinc_processor(processor.ProcessorABC):
                 _histogram_filler(ch, sys, 'dijet_mass')
                 _histogram_filler(ch, sys, 'dijet_deta')
                 _histogram_filler(ch, sys, 'min_dphi_met_j')
-                _histogram_filler(ch, sys, 'gnn_score')
-                _histogram_filler(ch, sys, 'gnn_flat')
+                # _histogram_filler(ch, sys, 'gnn_score')
+                # _histogram_filler(ch, sys, 'gnn_flat')
                 _histogram_filler(ch, sys,  'lead_jet_pt')
                 _histogram_filler(ch, sys,  'trail_jet_pt')
                 _histogram_filler(ch, sys,  'third_jet_pt')
