@@ -56,13 +56,14 @@ def validate_input_file(nanofile):
 
 def main():
     parser = argparse.ArgumentParser("")
-    parser.add_argument('--analysis',  type=str, default='inc-WZ', help="Processor name to apply to datasets, and parent folder for config files")
-    parser.add_argument('--jobNum' ,   type=int, default=1     , help="")
-    parser.add_argument('--era'    ,   type=str, default="2018", help="")
-    parser.add_argument('--isMC'   ,   type=int, default=1     , help="")
-    parser.add_argument('--infile' ,   type=str, default=None  , help="input root file")
-    parser.add_argument('--dataset',   type=str, default=None  , help="dataset name. need to specify if file is not in EOS")
-    parser.add_argument('--runperiod', type=str, default=None)
+    parser.add_argument('--analysis' , type=str, default='inc-WZ'         , help="Processor name to apply to datasets, and parent folder for config files")
+    parser.add_argument('--jobNum'   , type=int, default=1                , help="")
+    parser.add_argument('--era'      , type=str, default="2018"           , help="")
+    parser.add_argument('--isMC'     , type=int, default=1                , help="")
+    parser.add_argument('--infile'   , type=str, default=None             , help="input root file")
+    parser.add_argument('--dataset'  , type=str, default=None             , help="dataset name. need to specify if file is not in EOS")
+    parser.add_argument('--runperiod', type=str, default=None             , help="run period, can be auto-parse if full dataset paths are utilized")
+    parser.add_argument("--zzdd"     , type=str, default="onlySR"         , help="For vbs-ZZ and/or inc-ZZ analyses DataDriven, options: onlySR,DYSR,MC")
     parser.add_argument('--executor' , type=str, default="FuturesExecutor", help="Executor to use, one of IterativeExecutor (good for debugging), FuturesExecutor (multithreaded), or other coffea option")
     parser.add_argument('--copyInput', action='store_true'     , help="xrdcp a file to the worker node before executing the coffea processor on it")
     parser.add_argument('--maxChunks', '--maxchunks', type=int, default= -1, help="limit number of chunks per-file to this number at most, default '-1' to process all")
@@ -190,11 +191,13 @@ def main():
                 ewk_flag= 'ZZ'
             if "WZTo" in options.infile and "GluGluTo" not in options.infile:
                 ewk_flag = 'WZ'
+            dy_flag = False
+            if "DYJetsToLL" in options.infile:
+                dy_flag = True
 
             # extarct the run period
             if is_data:
                 if 'Run20' in options.infile:
-                    # options.runperiod = file_name.split('/store/data/')[1].split('/')[0].replace(f'Run{options.era}','')
                     options.runperiod = auto_runperiod.replace(f'Run{options.era}','')
             else:
                 options.runperiod = ''
@@ -213,6 +216,7 @@ def main():
                 -- executor  = {options.executor}
                 -- copyInput = {options.copyInput}
                 -- maxChunks = {options.maxChunks if options.maxChunks > 0 else "None"}
+                -- zzdd    = {options.zzdd if options.analysis in ['vbs-ZZ', 'inc-ZZ'] else 'N/A'}
 
                 ---------------------------"""
             )
@@ -243,6 +247,28 @@ def main():
                 proc_configured = trig_processor(
                     isMC=options.isMC,
                     era=options.era)
+            elif options.analysis in ["inc-ZZ"]:
+                from qawa.process.zz2l2nu_inclusive import zzinc_processor
+                coffea_console.print(" --- zz2l2nu_inclusive main code processor ... ")
+                proc_configured = zzinc_processor(
+                    era=options.era,
+                    isDY=DY_flag,
+                    dd = options.zzdd,
+                    ewk_process_name=ewk_flag,
+                    # dump_gnn_array=options.dumpgnn,
+                    run_period=options.runperiod if is_data else ''
+                )
+            elif options.analysis in ["vbs-ZZ"]:
+                from qawa.process.zz2l2nu_vbs import zzinc_processor
+                coffea_console.print(" --- zz2l2nu_vbs main code processor ... ")
+                proc_configured = zzinc_processor(
+                    era=options.era,
+                    isDY=DY_flag,
+                    dd = options.zzdd,
+                    ewk_process_name=ewk_flag,
+                    # dump_gnn_array=options.dumpgnn,
+                    run_period=options.runperiod if is_data else ''
+                )
             else:
                 raise NotImplementedError(f"{options.analysis} does not have hooks for loading a processor, please update the code to point appropriately to it, along with any necessary init configuration options.")
 
