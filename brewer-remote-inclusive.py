@@ -252,7 +252,7 @@ def main():
                 coffea_console.print(" --- zz2l2nu_inclusive main code processor ... ")
                 proc_configured = zzinc_processor(
                     era=options.era,
-                    isDY=DY_flag,
+                    isDY=dy_flag,
                     dd = options.zzdd,
                     ewk_process_name=ewk_flag,
                     # dump_gnn_array=options.dumpgnn,
@@ -263,7 +263,7 @@ def main():
                 coffea_console.print(" --- zz2l2nu_vbs main code processor ... ")
                 proc_configured = zzinc_processor(
                     era=options.era,
-                    isDY=DY_flag,
+                    isDY=dy_flag,
                     dd = options.zzdd,
                     ewk_process_name=ewk_flag,
                     # dump_gnn_array=options.dumpgnn,

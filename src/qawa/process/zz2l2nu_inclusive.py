@@ -18,6 +18,7 @@ from coffea.nanoevents.methods import candidate
 from coffea.nanoevents.methods import nanoaod
 from coffea.analysis_tools import Weights, PackedSelection
 from coffea.lumi_tools import LumiMask
+from coffea.util import coffea_console
 
 from qawa.roccor import rochester_correction
 # from qawa.applyGNN_old import applyGNN
@@ -30,6 +31,7 @@ from qawa.gen_match import delta_r2, find_best_match
 from qawa.ddr_SR import dataDrivenDYRatio
 from qawa.common import pileup_weights, ewk_corrector, met_phi_xy_correction, theory_ps_weight, theory_pdf_weight, trigger_rules
 
+coffea_console.print("WARNING: build_htaus function using probably too-loose selections, should be re-evaluated for rejecting taus: calibration available for VTight, Tight, Medium, Loose VSjet scores (64, 32, 16, 8) but only Loose and Tight VSe scores (1==VVVLoose), which should be paired appropriately in the TauSF code")
 def build_leptons(muons, electrons):
     tight_muons_mask = (
         (muons.pt             >  20. ) &
@@ -74,7 +76,6 @@ def build_leptons(muons, electrons):
     return tight_leptons, nloose 
 
 def build_htaus(tau, lepton):
-    print("build_htaus function using probably too-loose selections, should be re-evaluated for rejecting taus: calibration available for VTight, Tight, Medium, Loose VSjet scores (64, 32, 16, 8) but only Loose and Tight VSe scores (1==VVVLoose), which should be paired appropriately in the TauSF code")
     base = (
         (tau.pt         > 20 ) &
         (np.abs(tau.eta)< 2.3 ) &
@@ -552,7 +553,7 @@ class zzinc_processor(processor.ProcessorABC):
         had_taus = build_htaus(events.Tau, tight_lep)
         ntight_lep = ak.num(tight_lep)
         nhtaus_lep = ak.num(had_taus)
-        good_jets, good_bjets = build_jets(eventss.Jet, tight_lep, had_taus, self.btag_wp, self._era, self._isAPV)
+        good_jets, good_bjets = build_jets(events.Jet, tight_lep, had_taus, self.btag_wp, self._era, self._isAPV)
         sorted_jet_indices, sorted_bjet_indices = ak.argsort(good_jets.pt, ascending=False), ak.argsort(good_bjets.pt, ascending=False)
         good_jets, good_bjets = good_jets[sorted_jet_indices], good_bjets[sorted_bjet_indices]
 
@@ -951,7 +952,7 @@ class zzinc_processor(processor.ProcessorABC):
                 _histogram_filler(ch, sys,  'third_lep_phi') 
         return {dataset: histos}
         
-    def process(self, events: processor.LazyDataFrame):
+    def process(self, events):
         dataset_name = events.metadata['dataset']
         is_data = events.metadata.get("is_data")
 
@@ -963,13 +964,11 @@ class zzinc_processor(processor.ProcessorABC):
         met_to_correct = events.MET
 
         jets = self._jmeu.corrected_jets_L123_JER(events.Jet, events.fixedGridRhoFastjetAll, cache)
-        # jets_to_correct_met = self._jmeu.corrected_jets_L123_noJER(events.Jet, events.fixedGridRhoFastjetAll, cache)
         met = self._jmeu.corrected_met(met_to_correct, jets, events.fixedGridRhoFastjetAll, cache) # we are adding fully smeared L123 jets
 
         events = ak.with_field(events, events.Jet, 'OrigJet')
         events = ak.with_field(events, events.MET, 'OrigMET')
         events = ak.with_field(events, jets, 'Jet')
-        events = ak.with_field(events, jets_to_correct_met, 'JetforMET')
         events = ak.with_field(events, met, 'MET')
 
         # x-y met shit corrections
@@ -1115,10 +1114,10 @@ class zzinc_processor(processor.ProcessorABC):
 #         ewk_process_name="ZZ",
 #         run_period='',
 #         dump_gnn_array=False),
-#     treename='Eventss',
+#     treename='Events',
 #     executor=processor.futures_executor,
 #     executor_args={
-#         "schema": nanoeventss.NanoAODSchema,
+#         "schema": nanoevents.NanoAODSchema,
 #         "workers": 16
 #     },
 #     # chunksize=200,
