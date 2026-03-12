@@ -723,6 +723,7 @@ class zzinc_processor(processor.ProcessorABC):
         event['min_dphi_met_j'] = ak.fill_none(min_dphi_met_j,np.nan)
 
         event['leading_lep_pt'  ] = ak.fill_none(lead_lep.pt,np.nan)
+        event['leading_lep_pdgId' ] = ak.fill_none(lead_lep.pdgId,np.nan)
         event['leading_lep_eta' ] = ak.fill_none(lead_lep.eta,np.nan)
         event['leading_lep_phi' ] = ak.fill_none(lead_lep.phi,np.nan)
         event['trailing_lep_pt' ] = ak.fill_none(subl_lep.pt,np.nan)
@@ -910,10 +911,15 @@ class zzinc_processor(processor.ProcessorABC):
             cut =  selection.require(**sel_args_)
             weight = weights.weight()[cut]
 
+            jet_pts = ak.to_list(ak.fill_none(good_jets[cut].pt, np.nan))
+
             _dicv = {
                 ch: {
                     "event": _format_variable(event.event, cut).tolist(), 
-                    "gnn": _format_variable(event["gnn_score"], cut).tolist(), 
+                    # "gnn": _format_variable(event["gnn_score"], cut).tolist(), 
+                    "jet_pt": jet_pts,
+                    "lepton_pt": _format_variable(event['leading_lep_pt'], cut).tolist(), 
+                    "lepton_pdgId" : _format_variable(event['leading_lep_pdgId'], cut).tolist(), 
                     "weight": weight.tolist()
                 }
             }
