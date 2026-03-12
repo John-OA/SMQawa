@@ -1,6 +1,4 @@
 import os
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # 1:去掉INFO, 2:去掉INFO+WARNING, 3:连ERROR也去掉
-os.environ["CUDA_VISIBLE_DEVICES"] = ""   # 让 TF 不去枚举 GPU（不必要但可减少相关噪声）
 
 import awkward as ak
 import numpy as np
@@ -39,8 +37,7 @@ def build_leptons(muons, electrons):
         (np.abs(muons.dxy)    <  0.02) &
         (np.abs(muons.dz )    <  0.1 ) &
         (muons.pfRelIso04_all <= 0.15) & 
-        muons.tightId &
-        muons.softId 
+        muons.tightId
     )
     tight_muons = muons[tight_muons_mask]
 
@@ -49,7 +46,7 @@ def build_leptons(muons, electrons):
         (muons.pt            >  10. ) &
         (np.abs(muons.eta)   <  2.4 ) &
         (muons.pfRelIso04_all<= 0.25) &
-        muons.softId  
+        muons.looseId
     ]
     SCeta = np.abs(electrons.eta + electrons.deltaEtaSC)
     tight_electrons_mask = (
@@ -77,6 +74,7 @@ def build_leptons(muons, electrons):
     return tight_leptons, nloose 
 
 def build_htaus(tau, lepton):
+    print("build_htaus function using probably too-loose selections, should be re-evaluated for rejecting taus: calibration available for VTight, Tight, Medium, Loose VSjet scores (64, 32, 16, 8) but only Loose and Tight VSe scores (1==VVVLoose), which should be paired appropriately in the TauSF code")
     base = (
         (tau.pt         > 20 ) & 
         (np.abs(tau.eta)< 2.3 ) & 
