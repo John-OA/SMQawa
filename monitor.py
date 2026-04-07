@@ -4,7 +4,7 @@ import shutil
 import logging
 import subprocess
 import rich
-from pandas.core.internals.array_manager import new_block
+# from pandas.core.internals.array_manager import new_block
 # from termcolor import colored
 import importlib.metadata
 qawa_version = "0.0.7"
@@ -97,6 +97,7 @@ def main():
     parser.add_argument("-i"   , "--input" , type=str, default="input"  , required=True)
     parser.add_argument("-t"   , "--tag"   , type=str, default="algiers", required=True)
     parser.add_argument("-isMC", "--isMC"  , type=int, default=1        , help="")
+    parser.add_argument("--split_by_charge", action="store_true", help="split templates by tau charge")
     parser.add_argument("-e"   , "--era"   , type=str, default="2018"   , help="")
     parser.add_argument("--runlocal", action="store_true")
     parser.add_argument("--resubmit", action="store_true", help="resubmit failed jobs")
@@ -259,7 +260,7 @@ def main():
                         #     )
                         #     infile_name = infile.split('/')[-1]
                         local_rerun_lines.append(
-                            f"$INSTALL_LOC_EXTERNAL/.env/bin/python3 brewer-remote-inclusive.py --jobNum={jid} --isMC={options.isMC} --era={options.era} --infile={infile_name} --executor={options.executor} {'--copyInput' if options.copyInput else ''}\n"
+                            f"$INSTALL_LOC_EXTERNAL/.env/bin/python3 brewer-remote-inclusive.py --jobNum={jid} --isMC={options.isMC} {"--split_by_charge" if options.split_by_charge else ""} --era={options.era} --infile={infile_name} --executor={options.executor} {'--copyInput' if options.copyInput else ''}\n"
                             # f"python brewer-remote-inclusive.py --jobNum={jid} --isMC={options.isMC} --era={options.era} --infile={infile_name} --dataset={dataset_name}\n"
                         )
                         if options.copyInput:
@@ -270,7 +271,7 @@ def main():
                             # script_command = f"xrdcp root://cms-xrd-global.cern.ch/$2 . \n"
                             # infile_name = infile.split('/')[-1]
                             # script_command += f"python3 brewer-remote-inclusive.py --jobNum=$1 --isMC={options.isMC} --era={options.era} --infile={infile_name} --dataset={dataset_name} --runperiod={run_period} --copyInput\n"
-                            script_command = f"$INSTALL_LOC_EXTERNAL/.env/bin/python3 brewer-remote-inclusive.py --jobNum=$1 --isMC={options.isMC} --era={options.era} --infile={infile_name} --dataset={dataset_name} --runperiod={run_period}--executor={options.executor} {'--copyInput' if options.copyInput else ''}\n"
+                            script_command = f"$INSTALL_LOC_EXTERNAL/.env/bin/python3 brewer-remote-inclusive.py --jobNum=$1 --isMC={options.isMC} {"--split_by_charge" if options.split_by_charge else ""} --era={options.era} --infile={infile_name} --dataset={dataset_name} --runperiod={run_period}--executor={options.executor} {'--copyInput' if options.copyInput else ''}\n"
                             # script_command += f"rm {infile_name}\n" Should not be needed, file is downloaded to a temporary directory which gets cleaned
                             script_command += "ls -lthr\n"
                             with open(os.path.join(jobs_dir, f"resub-script-{jid}.sh"), "w") as _stream:
@@ -287,7 +288,7 @@ def main():
                                 _stream.close()
                         else: 
                             assert options.era != "", f'please specify the era of the dataset you are running. ex: --era=2018'
-                            script_command = f"$INSTALL_LOC_EXTERNAL/.env/bin/python3 brewer-remote-inclusive.py --jobNum=$1 --isMC={options.isMC} --era={options.era} --infile=$2 --executor={options.executor} {'--copyInput' if options.copyInput else ''}\n"
+                            script_command = f"$INSTALL_LOC_EXTERNAL/.env/bin/python3 brewer-remote-inclusive.py --jobNum=$1 --isMC={options.isMC} {"--split_by_charge" if options.split_by_charge else ""} --era={options.era} --infile=$2 --executor={options.executor} {'--copyInput' if options.copyInput else ''}\n"
                             # script_command = f"python brewer-remote-inclusive.py --jobNum=$1 --isMC={options.isMC} --era={options.era} --infile=$2\n"
                             script_command += "ls -lthr\n"
                             with open(os.path.join(jobs_dir, f"resub-script-{jid}.sh"), "w") as _stream:
