@@ -131,6 +131,8 @@ def main():
                     pass
                 else:
                     file_name = aliases[ixrd] + options.infile
+            else:
+                coffea_console.print(f"Skipping redirector prepending for file {file_name}")
 
             if options.copyInput:
                 if local_file_name is None and file_name.startswith("root://"):
