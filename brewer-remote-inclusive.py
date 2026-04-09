@@ -237,7 +237,7 @@ def main():
                     ewk_process_name=ewk_flag,
                     run_period=options.runperiod if is_data else ''
                 )
-            elif options.analysis in ["inc-Fxsec"]:
+            elif options.analysis in ["inc-WZ-Fxsec"]:
                 from qawa.process.Fxsec import wzinclusive_processor 
                 coffea_console.print(" --- wztau2lnu_inclusive FV Xsec processor ... ")
                 proc_configured = wzinclusive_processor(
