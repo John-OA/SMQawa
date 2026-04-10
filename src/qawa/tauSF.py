@@ -32,6 +32,8 @@ class tauIDScaleFactors:
         self.isEE = isEE
         self.isBPix = isBPix
         assert sum([self.isAPV, self.isEE, self.isBPix]) <= 1, "Multiple incompatible suberas selected as active"
+        assert self.vsmu_wp in ["Tight"], "Tau vsmu_wp may not be in calibrated WPs, double-check and update accordingly"
+        assert self.vse_wp in ["VVLoose", "Tight"], "Tau vse_wp may not be in calibrated WPs, double-check and update accordingly"
         if isAPV:
             self._subera = "_APV"
         elif isEE:
@@ -47,7 +49,6 @@ class tauIDScaleFactors:
         with gzip.open(fname,'rt') as file:
             data = file.read().strip()
             cset = correctionlib.CorrectionSet.from_string(data)
-            # cset = correctionlib.CorrectionSet.from_file(file)
 
         #Load Correction Objects :
         self.corr_vsjet = cset[f"{self.tagger}VSjet"]
@@ -170,54 +171,68 @@ class tauIDScaleFactors:
 
         return tau_pt, tau_pt_EnUp, tau_pt_EnDown, tau_mass, tau_mass_EnUp, tau_mass_EnDown
 
-    # def append_tauID_sf(self, taus: ak.Array, weights: Weights):
+    def append_tauID_sf(self, taus: ak.Array, weights: Weights):
 
-    #     # taus = taus[(taus.pt >= 20) & (np.abs(taus.eta) <= 2.3) & (np.abs(taus.dz) < 0.2)]
-
-    #     sf_vsjet_nom, sf_vse_nom, sf_vsmu_nom = self.getSF(taus, syst="nom")
-    #     sf_vsjet_up, sf_vse_up, sf_vsmu_up = self.getSF(taus, syst="up")
-    #     sf_vsjet_down, sf_vse_down, sf_vsmu_down = self.getSF(taus, syst="down")
+        sf_vsjet_nom, sf_vse_nom, sf_vsmu_nom = self.getSF(taus, syst="nom")
+        sf_vsjet_up, sf_vse_up, sf_vsmu_up = self.getSF(taus, syst="up")
+        sf_vsjet_down, sf_vse_down, sf_vsmu_down = self.getSF(taus, syst="down")
 
 
-    #     weights.add('tauIDvsjet_sf', sf_vsjet_nom, sf_vsjet_up, sf_vsjet_down)
-    #     weights.add('tauIDvse_sf'  , sf_vse_nom, sf_vse_up, sf_vse_down)
-    #     weights.add('tauIDvsmu_sf' , sf_vsmu_nom, sf_vsmu_up, sf_vsmu_down)
+        weights.add('tauIDvsjet_sf', sf_vsjet_nom, sf_vsjet_up, sf_vsjet_down)
+        weights.add('tauIDvse_sf'  , sf_vse_nom, sf_vse_up, sf_vse_down)
+        weights.add('tauIDvsmu_sf' , sf_vsmu_nom, sf_vsmu_up, sf_vsmu_down)
 
-    #     return sf_vsjet_nom, sf_vsjet_up, sf_vsjet_down, sf_vse_nom, sf_vse_up, sf_vse_down, sf_vsmu_nom, sf_vsmu_up, sf_vsmu_down
+        return sf_vsjet_nom, sf_vsjet_up, sf_vsjet_down, sf_vse_nom, sf_vse_up, sf_vse_down, sf_vsmu_nom, sf_vsmu_up, sf_vsmu_down
 
-    def append_tauID_sf(self,taus_vtight: ak.Array, taus_loose: ak.Array, mask_vtight: ak.Array, weights: Weights):
-   
+    def append_tauID_multiwp_sf(self,
+                                taus_vtight: ak.Array, taus_tight: ak.Array, taus_loose: ak.Array,
+                                mask_vtight: ak.Array, mask_tight: ak.Array, mask_loose: ak.Array,
+                                weights: Weights
+                                ):
+        # store original WP to prevent statefulness bug
+        original_WP = self.vsjet_wp   
+
         self.vsjet_wp = "VTight"
-
         vtight_vsjet_nom, vtight_vse_nom, vtight_vsmu_nom = self.getSF(taus_vtight, syst="nom")
         vtight_vsjet_up,  vtight_vse_up,  vtight_vsmu_up  = self.getSF(taus_vtight, syst="up")
         vtight_vsjet_dn,  vtight_vse_dn,  vtight_vsmu_dn  = self.getSF(taus_vtight, syst="down")
 
-        self.vsjet_wp = "Loose"
+        self.vsjet_wp = "Tight"
+        tight_vsjet_nom, tight_vse_nom, tight_vsmu_nom = self.getSF(taus_tight, syst="nom")
+        tight_vsjet_up,  tight_vse_up,  tight_vsmu_up  = self.getSF(taus_tight, syst="up")
+        tight_vsjet_dn,  tight_vse_dn,  tight_vsmu_dn  = self.getSF(taus_tight, syst="down")
 
+        self.vsjet_wp = "Loose"
         loose_vsjet_nom, loose_vse_nom, loose_vsmu_nom = self.getSF(taus_loose, syst="nom")
         loose_vsjet_up,  loose_vse_up,  loose_vsmu_up  = self.getSF(taus_loose, syst="up")
         loose_vsjet_dn,  loose_vse_dn,  loose_vsmu_dn  = self.getSF(taus_loose, syst="down")
+
+        # restore original WP, we do not want to introduce a statefulness bug with usage
+        self.vsjet_wp = original_WP
 
         vtight_vsjet_nom = ak.fill_none(vtight_vsjet_nom, 1.0)
         vtight_vsjet_up  = ak.fill_none(vtight_vsjet_up , 1.0)
         vtight_vsjet_dn  = ak.fill_none(vtight_vsjet_dn , 1.0)
 
+        tight_vsjet_nom = ak.fill_none(vtight_vsjet_nom, 1.0)
+        tight_vsjet_up  = ak.fill_none(vtight_vsjet_up , 1.0)
+        tight_vsjet_dn  = ak.fill_none(vtight_vsjet_dn , 1.0)
+        
         loose_vsjet_nom = ak.fill_none(loose_vsjet_nom, 1.0)
         loose_vsjet_up  = ak.fill_none(loose_vsjet_up , 1.0)
         loose_vsjet_dn  = ak.fill_none(loose_vsjet_dn , 1.0)
 
-        sf_vsjet_nom = ak.where(mask_vtight, vtight_vsjet_nom, loose_vsjet_nom)
-        sf_vsjet_up  = ak.where(mask_vtight, vtight_vsjet_up , loose_vsjet_up )
-        sf_vsjet_dn  = ak.where(mask_vtight, vtight_vsjet_dn , loose_vsjet_dn )
+        sf_vsjet_nom = ak.where(mask_vtight, vtight_vsjet_nom, ak.where(mask_tight, tight_vsjet_nom, loose_vsjet_nom))
+        sf_vsjet_up  = ak.where(mask_vtight, vtight_vsjet_up , ak.where(mask_tight, tight_vsjet_up , loose_vsjet_up ))
+        sf_vsjet_dn  = ak.where(mask_vtight, vtight_vsjet_dn , ak.where(mask_tight, tight_vsjet_dn , loose_vsjet_dn ))
 
-        sf_vse_nom = ak.where(mask_vtight, vtight_vse_nom, loose_vse_nom)
-        sf_vse_up  = ak.where(mask_vtight, vtight_vse_up , loose_vse_up )
-        sf_vse_dn  = ak.where(mask_vtight, vtight_vse_dn , loose_vse_dn )
+        sf_vse_nom   = ak.where(mask_vtight, vtight_vse_nom, ak.where(mask_tight, tight_vse_nom, loose_vse_nom))
+        sf_vse_up    = ak.where(mask_vtight, vtight_vse_up , ak.where(mask_tight, tight_vse_up , loose_vse_up ))
+        sf_vse_dn    = ak.where(mask_vtight, vtight_vse_dn , ak.where(mask_tight, tight_vse_dn , loose_vse_dn ))
 
-        sf_vsmu_nom = ak.where(mask_vtight, vtight_vsmu_nom, loose_vsmu_nom)
-        sf_vsmu_up  = ak.where(mask_vtight, vtight_vsmu_up , loose_vsmu_up )
-        sf_vsmu_dn  = ak.where(mask_vtight, vtight_vsmu_dn , loose_vsmu_dn )
+        sf_vsmu_nom  = ak.where(mask_vtight, vtight_vsmu_nom, ak.where(mask_tight, tight_vsmu_nom, loose_vsmu_nom))
+        sf_vsmu_up   = ak.where(mask_vtight, vtight_vsmu_up , ak.where(mask_tight, tight_vsmu_up , loose_vsmu_up ))
+        sf_vsmu_dn   = ak.where(mask_vtight, vtight_vsmu_dn , ak.where(mask_tight, tight_vsmu_dn , loose_vsmu_dn ))
 
         weights.add('tauIDvsjet_sf', sf_vsjet_nom, sf_vsjet_up, sf_vsjet_dn)
         weights.add('tauIDvse_sf',   sf_vse_nom,   sf_vse_up,   sf_vse_dn)
