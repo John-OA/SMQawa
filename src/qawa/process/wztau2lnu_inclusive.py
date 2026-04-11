@@ -97,14 +97,12 @@ def build_leptons(muons, electrons):
     return tight_leptons, loose_leptons, non_iso_leptons
 
 def build_htaus(tau, lepton):
-    #coffea_console.print(dir(tau))
-    #coffea_console.print(tau.__dict__)
     
     base_selection = (
-        (tau.pt         > 20 ) & 
+        (tau.pt         > 20 ) &
         (np.abs(tau.eta)< 2.3 ) &
         (np.abs(tau.dz)< 0.2 ) &
-        (tau.decayMode != 5   ) & 
+        (tau.decayMode != 5   ) &
         (tau.decayMode != 6   ) &
         (tau.idDeepTau2017v2p1VSe >= 32) & #change from 32 Tight to 2 VVLoose
         (tau.idDeepTau2017v2p1VSmu >= 8) &
@@ -115,11 +113,11 @@ def build_htaus(tau, lepton):
         tau.metric_table(lepton) <= 0.4,
         axis=2
     )
-   
+
     return tau[base_selection & ~overlap_leptons]
 
 def build_htaus_tight(tau, lepton):
-    
+
     base_selection = (
         (tau.pt         > 20 ) & 
         (np.abs(tau.eta)< 2.3 ) & 
