@@ -97,37 +97,35 @@ def build_leptons(muons, electrons):
     return tight_leptons, loose_leptons, non_iso_leptons
 
 def build_htaus(tau, lepton):
-    #coffea_console.print(dir(tau))
-    #coffea_console.print(tau.__dict__)
     
     base_selection = (
-        (tau.pt         > 20 ) & 
+        (tau.pt         > 20 ) &
         (np.abs(tau.eta)< 2.3 ) &
         (np.abs(tau.dz)< 0.2 ) &
-        (tau.decayMode != 5   ) & 
+        (tau.decayMode != 5   ) &
         (tau.decayMode != 6   ) &
-        (tau.idDeepTau2017v2p1VSe >= 64) &
+        (tau.idDeepTau2017v2p1VSe >= 32) & #change from 32 Tight to 2 VVLoose
         (tau.idDeepTau2017v2p1VSmu >= 8) &
-        (tau.idDeepTau2017v2p1VSjet >= 64)
+        (tau.idDeepTau2017v2p1VSjet >= 64) #these are nested bit set but we can still target the exact value of an ID
     )
 
     overlap_leptons = ak.any(
         tau.metric_table(lepton) <= 0.4,
         axis=2
     )
-   
+
     return tau[base_selection & ~overlap_leptons]
 
 def build_htaus_tight(tau, lepton):
-    
+
     base_selection = (
         (tau.pt         > 20 ) & 
         (np.abs(tau.eta)< 2.3 ) & 
         (np.abs(tau.dz)< 0.2 ) &
         (tau.decayMode != 5   ) & 
         (tau.decayMode != 6   ) &
-        (tau.idDeepTau2017v2p1VSe >= 32) &
-        (tau.idDeepTau2017v2p1VSmu >= 4) &
+        (tau.idDeepTau2017v2p1VSe >= 32) & #change from 32 Tight to 2 VVLoose
+        (tau.idDeepTau2017v2p1VSmu >= 8) &
         (tau.idDeepTau2017v2p1VSjet >= 32)
     )
 
@@ -146,9 +144,9 @@ def build_htaus_loose(tau, lepton):
         (np.abs(tau.dz)< 0.2 ) &
         (tau.decayMode != 5   ) & 
         (tau.decayMode != 6   ) &
-        (tau.idDeepTau2017v2p1VSe >= 1) &
-        (tau.idDeepTau2017v2p1VSmu >= 1) &
-        (tau.idDeepTau2017v2p1VSjet >= 1)
+        (tau.idDeepTau2017v2p1VSe >= 32) & #change from 32 Tight to 2 VVLoose
+        (tau.idDeepTau2017v2p1VSmu >= 8) &
+        (tau.idDeepTau2017v2p1VSjet >= 8)
     )
 
     overlap_leptons = ak.any(
@@ -220,8 +218,9 @@ def apply_hem_uncertainty(jets, met):
 
 class wzinclusive_processor(processor.ProcessorABC):
     # EWK corrections process has to be define before hand, it has to change when we move to dask
-    def __init__(self, era: str ='2018', ewk_process_name=None, run_period: str = ''): 
+    def __init__(self, era: str ='2018', ewk_process_name=None, run_period: str = '', split_by_charge:bool = False): 
         self._era = era
+        self._split_by_charge = split_by_charge
         if 'APV' in self._era:
             self._isAPV = True
             self._era = re.findall(r'\d+', self._era)[0] 
@@ -271,9 +270,10 @@ class wzinclusive_processor(processor.ProcessorABC):
         
         self.btag_wp = 'L'
         self.jetPU_wp = 'M'
-        self.tauIDvsjet_wp = 'VTight' #Medium is working
-        self.tauIDvse_wp = 'VTight' #changing to Vloose from VVLoose
+        self.tauIDvsjet_wp = 'VTight' #This wp refers to the vtight tau we are selecting but it will be overwritten by VTigh and Loose wp for the Vtight and Loose tau SF in the tau_SF.py
+        self.tauIDvse_wp = 'Tight' 
         self.tauIDvsmu_wp = 'Tight'
+        # self.tauIDvsjet_loose_wp = 'Loose' 
         self.zmass = 91.1873 # GeV 
         self._btag = BTVCorrector(era=self._era, wp=self.btag_wp, isAPV=self._isAPV)
         self._jmeu = JMEUncertainty(jec_tag, jer_tag, era=self._era, is_mc=(len(run_period)==0))
@@ -281,6 +281,7 @@ class wzinclusive_processor(processor.ProcessorABC):
         self._leSF = LeptonScaleFactors(era=self._era, isAPV=self._isAPV)
         self._jpSF = jetPUScaleFactors(era=self._era, wp=self.jetPU_wp, isAPV=self._isAPV)
         self._tauID= tauIDScaleFactors(era=self._era, vsjet_wp=self.tauIDvsjet_wp,vse_wp=self.tauIDvse_wp, vsmu_wp=self.tauIDvsmu_wp, isAPV=self._isAPV)
+        # self._tauID_loose= tauIDScaleFactors(era=self._era, vsjet_wp=self.tauIDvsjet_loose_wp,vse_wp=self.tauIDvse_wp, vsmu_wp=self.tauIDvsmu_wp, isAPV=self._isAPV)
         self._dd   = DataDrivenEventReweight(era=self._era)
 
         _data_path = 'qawa/data'
@@ -390,8 +391,8 @@ class wzinclusive_processor(processor.ProcessorABC):
             'tau_pt': hist.Hist(
                 hist.axis.StrCategory([], name="channel"   , growth=True),
                 hist.axis.StrCategory([], name="systematic", growth=True),
-                hist.axis.Regular(60, 0, 600, name="tau_pt", label=r"$p_{T}^{tau}$ (GeV)"), 
-                # hist.axis.Variable(self.ABCD_tau_bins, name="tau_pt", label=r"$p_{T}^{tau}$ (GeV)"),
+                # hist.axis.Regular(60, 0, 600, name="tau_pt", label=r"$p_{T}^{tau}$ (GeV)"), 
+                hist.axis.Variable(self.ABCD_tau_bins, name="tau_pt", label=r"$p_{T}^{tau}$ (GeV)"),
                 hist.storage.Weight()
             ),
             'taus_eta': hist.Hist(
@@ -409,8 +410,8 @@ class wzinclusive_processor(processor.ProcessorABC):
             'tau_pt_loose': hist.Hist(
                 hist.axis.StrCategory([], name="channel"   , growth=True),
                 hist.axis.StrCategory([], name="systematic", growth=True),
-                hist.axis.Regular(60, 0, 600, name="tau_pt_loose", label=r"$p_{T}^{tau_loose}$ (GeV)"), 
-                # hist.axis.Variable(self.ABCD_tau_bins, name="tau_pt_loose", label=r"$p_{T}^{tau_loose}$ (GeV)"),
+                # hist.axis.Regular(60, 0, 600, name="tau_pt_loose", label=r"$p_{T}^{tau_loose}$ (GeV)"), 
+                hist.axis.Variable(self.ABCD_tau_bins, name="tau_pt_loose", label=r"$p_{T}^{tau_loose}$ (GeV)"),
                 hist.storage.Weight()
             ),
             'taus_eta_loose': hist.Hist(
@@ -542,7 +543,7 @@ class wzinclusive_processor(processor.ProcessorABC):
             'dilep_dR': hist.Hist(
                 hist.axis.StrCategory([], name="channel"   , growth=True),
                 hist.axis.StrCategory([], name="systematic", growth=True), 
-                hist.axis.Regular(50, 0, np.pi, name="dilep_dR", label=r"$\Delta R(\ell\ell)$"),
+                hist.axis.Regular(50, 0, 5, name="dilep_dR", label=r"$\Delta R(\ell\ell)$"),
                 hist.storage.Weight()
             ),
             'min_dphi_met_j': hist.Hist( 
@@ -599,22 +600,22 @@ class wzinclusive_processor(processor.ProcessorABC):
                 hist.axis.Regular(5, 0, 5, name="nbjets", label=r"$N_{b-jet}$ ($p_{T}>30$ GeV)"),
                 hist.storage.Weight()
             ),
-            'ntaus_vtight': hist.Hist(
+            'nhtaus_vtight': hist.Hist(
                 hist.axis.StrCategory([], name="channel"   , growth=True),
                 hist.axis.StrCategory([], name="systematic", growth=True), 
-                hist.axis.Regular(5, 0, 5, name="ntaus_vtight", label=r"$N_{taus}$ (vtight)"),
+                hist.axis.Regular(5, 0, 5, name="nhtaus_vtight", label=r"$N_{taus}$ (vtight)"),
                 hist.storage.Weight()
             ), 
-            'ntaus_tight': hist.Hist(
+            'nhtaus_tight': hist.Hist(
                 hist.axis.StrCategory([], name="channel"   , growth=True),
                 hist.axis.StrCategory([], name="systematic", growth=True), 
-                hist.axis.Regular(5, 0, 5, name="ntaus_tight", label=r"$N_{taus}$ (tight)"),
+                hist.axis.Regular(5, 0, 5, name="nhtaus_tight", label=r"$N_{taus}$ (tight)"),
                 hist.storage.Weight()
             ),
-            'ntaus_loose': hist.Hist(
+            'nhtaus_loose': hist.Hist(
                 hist.axis.StrCategory([], name="channel"   , growth=True),
                 hist.axis.StrCategory([], name="systematic", growth=True), 
-                hist.axis.Regular(5, 0, 5, name="ntaus_loose", label=r"$N_{taus}$ (loose)"),
+                hist.axis.Regular(5, 0, 5, name="nhtaus_loose", label=r"$N_{taus}$ (loose)"),
                 hist.storage.Weight()
             ),
             'delta_R_non_iso_lep_loose_tau': hist.Hist(
@@ -694,7 +695,7 @@ class wzinclusive_processor(processor.ProcessorABC):
         _data_path = os.path.join(os.path.dirname(__file__), 'data/')
         dataset = event.metadata['dataset']
         is_data = event.metadata.get("is_data")
-        selection = PackedSelection()
+        selection = PackedSelection(dtype="uint64")
         weights = Weights(len(event), storeIndividual=True)
         
         histos = self.build_histos()
@@ -739,36 +740,85 @@ class wzinclusive_processor(processor.ProcessorABC):
 
         # Electrons and Muons and Taus
         tight_lep, loose_lep, non_iso_leptons = build_leptons(
-
             event.Muon,
             event.Electron
         )
         tight_sorter = ak.argsort(tight_lep.pt, axis=1, ascending=False)
         tight_lep = tight_lep[tight_sorter]
-        
+        ntight_lep = ak.num(tight_lep)
+        nloose_lep = ak.num(loose_lep)
+
+        # hadronic taus building, counting, sorting, ...
         had_taus = build_htaus(event.Tau, tight_lep)
         had_taus_loose = build_htaus_loose(event.Tau, tight_lep)
         had_taus_tight = build_htaus_tight(event.Tau, tight_lep)
 
-        ntight_lep = ak.num(tight_lep)
-        nloose_lep = ak.num(loose_lep)
-        nhtaus_lep = ak.num(had_taus)
-        nhtaus_lep_loose = ak.num(had_taus_loose)
+        # sort tau collections
+        vtight_tau_sorter = ak.argsort(had_taus.pt, axis=1, ascending=False)
+        had_taus = had_taus[vtight_tau_sorter]
+        had_taus_vtight_plus_mask = (had_taus.charge == 1)
+        had_taus_vtight_minus_mask = (had_taus.charge == -1)
+        nhtaus_lep_vtight = ak.num(had_taus)
+        nhtaus_lep_vtight_plus = ak.sum(had_taus_vtight_plus_mask, axis=1)
+        nhtaus_lep_vtight_minus = ak.sum(had_taus_vtight_minus_mask, axis=1)
+
+        tight_tau_sorter = ak.argsort(had_taus_tight.pt, axis=1, ascending=False)
+        had_taus_tight = had_taus_tight[tight_tau_sorter]
+        had_taus_tight_plus_mask = (had_taus_tight.charge == 1)
+        had_taus_tight_minus_mask = (had_taus_tight.charge == -1)
         nhtaus_lep_tight = ak.num(had_taus_tight)
+        nhtaus_lep_tight_plus = ak.sum(had_taus_tight_plus_mask, axis=1)
+        nhtaus_lep_tight_minus = ak.sum(had_taus_tight_minus_mask, axis=1)
 
-        lead_tau = ak.firsts(had_taus)
-        lead_tau_loose = ak.firsts(had_taus_loose)
+        loose_tau_sorter = ak.argsort(had_taus_loose.pt, axis=1, ascending=False)
+        # loose_tau_sorter = ak.argsort(had_taus_loose.idDeepTau2017v2p1VSjet, axis=1, ascending=False) #not needed if we always use lead_tau_for_vars
+        had_taus_loose = had_taus_loose[loose_tau_sorter]
+        had_taus_loose_plus_mask = (had_taus_loose.charge == 1)
+        had_taus_loose_minus_mask = (had_taus_loose.charge == -1)
+        nhtaus_lep_loose = ak.num(had_taus_loose)
+        nhtaus_lep_loose_plus = ak.sum(had_taus_loose_plus_mask, axis=1)
+        nhtaus_lep_loose_minus = ak.sum(had_taus_loose_minus_mask, axis=1)
+
+
+
+
+        tau_mask_vtight = (nhtaus_lep_vtight >= 1)
+        tau_mask_tight = (nhtaus_lep_tight >= 1)
+        tau_mask_loose = (nhtaus_lep_loose >= 1)
+        lead_tau_for_vars = ak.firsts(
+            ak.where(
+                tau_mask_vtight,
+                had_taus,
+                ak.where(tau_mask_tight,
+                         had_taus_tight,
+                         had_taus_loose
+                         )
+            )
+        )
+        lead_tau_plus_mask = lead_tau_for_vars.charge == 1
+        lead_tau_minus_mask = lead_tau_for_vars.charge == -1
+        lead_tau_plus_tag = ak.fill_none(lead_tau_plus_mask, False)
+        lead_tau_minus_tag = ak.fill_none(lead_tau_minus_mask, False)
+
+        #definig plus and minus lead tau for W plus/minus
+        # tau_plus  = had_taus[had_taus.charge == 1]
+        # tau_minus = had_taus[had_taus.charge == -1]
+
+        # tau_loose_plus =had_taus_loose[had_taus_loose.charge == 1]
+        # tau_loose_minus =had_taus_loose[had_taus_loose.charge == -1]
+
+        lead_tau_vtight = ak.firsts(had_taus)
         lead_tau_tight = ak.firsts(had_taus_tight)
-
-        tau_pt = lead_tau.pt
-        taus_phi = lead_tau.phi
-        taus_eta = lead_tau.eta
-        tau_pt = lead_tau.pt
-        tau_E = lead_tau.E
         lead_tau_loose = ak.firsts(had_taus_loose)
+
+        tau_pt = lead_tau_vtight.pt
+        taus_eta = lead_tau_vtight.eta
+        taus_phi = lead_tau_vtight.phi
+        tau_E = lead_tau_vtight.E
+
         tau_pt_loose = lead_tau_loose.pt
-        taus_phi_loose = lead_tau_loose.phi
         taus_eta_loose = lead_tau_loose.eta
+        taus_phi_loose = lead_tau_loose.phi
         tau_E_loose = lead_tau_loose.E
 
         lead_non_iso_lep = ak.firsts(non_iso_leptons)
@@ -779,19 +829,22 @@ class wzinclusive_processor(processor.ProcessorABC):
         delta_R_non_iso_lep_vtight_tau = lead_lep_tight.delta_r(lead_tau_loose)
         delta_R_non_iso_lep_tight_tau = lead_lep_loose.delta_r(lead_tau_loose)
 
-        deep_tau_e = lead_tau_loose.rawDeepTau2017v2p1VSe
-        deep_tau_mu = lead_tau_loose.rawDeepTau2017v2p1VSmu
-        deep_tau_jet = lead_tau_loose.rawDeepTau2017v2p1VSjet
+        deep_tau_e = lead_tau_for_vars.rawDeepTau2017v2p1VSe
+        deep_tau_mu = lead_tau_for_vars.rawDeepTau2017v2p1VSmu
+        deep_tau_jet = lead_tau_for_vars.rawDeepTau2017v2p1VSjet
 
-        jets = event.Jet        
+        jets = event.Jet
         good_jets, good_bjet = build_jets(jets, tight_lep, had_taus_loose, self.btag_wp, self._era, self._isAPV)
-        
+
+        jet_sorter = ak.argsort(good_jets.pt, axis=1, ascending=False)
+        good_jets = good_jets[jet_sorter]
+
         ngood_jets  = ak.num(good_jets)
         ngood_bjets = ak.num(good_bjet)
-        
+
         event['ngood_bjets'] = ngood_bjets
         event['ngood_jets']  = ngood_jets
-       
+
         # lepton quantities
         def z_lepton_pair(leptons):
             pair = ak.combinations(leptons, 2, axis=1, fields=['l1', 'l2'])
@@ -809,8 +862,8 @@ class wzinclusive_processor(processor.ProcessorABC):
         # subl_lep = ak.firsts(ak.where(dilep.l1.pt <= dilep.l2.pt, dilep.l1, dilep.l2),axis=1)
         lead_lep = ak.firsts(dilep.l1)
         subl_lep = ak.firsts(dilep.l2)
-        
-        
+
+
         dilep_p4 = (lead_lep + subl_lep)
         dilep_m  = dilep_p4.mass
         dilep_pt = dilep_p4.pt
@@ -833,7 +886,7 @@ class wzinclusive_processor(processor.ProcessorABC):
         reco_met_pt = ak.where(ntight_lep==2, p4_met.pt, emu_met.pt)
         reco_met_phi = ak.where(ntight_lep==2, p4_met.phi, emu_met.phi)
 
-    
+
         # this definition is not correct as it doesn't include the mass of the second Z
         dilep_et_ll = np.sqrt(dilep_pt**2 + dilep_m**2)
         dilep_et_nunu = np.sqrt(reco_met_pt**2 + self.zmass**2)
@@ -843,36 +896,36 @@ class wzinclusive_processor(processor.ProcessorABC):
                 np.sqrt((dilep_et_ll + dilep_et_nunu)**2 - ((dilep_p4.pvec + emu_met.pvec).pt)**2),
                 np.sqrt((dilep_et_ll + dilep_et_nunu)**2 - ((dilep_p4.pvec +  p4_met.pvec).pt)**2)
         )
-    
+
         dilep_dphi = lead_lep.delta_phi(subl_lep)
         dilep_deta = np.abs(lead_lep.eta - subl_lep.eta)
         dilep_dR   = lead_lep.delta_r(subl_lep)
 
-        delta_R = ak.where(ntight_lep==2, dilep_p4.delta_r(lead_tau), dilep_p4.delta_r(lead_tau))
+        delta_R = ak.where(ntight_lep==2, dilep_p4.delta_r(lead_tau_vtight), dilep_p4.delta_r(lead_tau_vtight))
         dilep_dphi_met  = ak.where(ntight_lep==2, dilep_p4.delta_phi(p4_met), dilep_p4.delta_phi(emu_met))
         #scalar_balance = ak.where(ntight_lep==3, emu_met.pt/dilep_p4.pt, p4_met.pt/dilep_p4.pt)
-        delta_tau_met_phi = ak.where(ntight_lep==2, lead_tau.delta_phi(p4_met), lead_tau.delta_phi(emu_met))
-        dilep_dphi_tau = ak.where(ntight_lep==2, dilep_p4.delta_phi(lead_tau), dilep_p4.delta_phi(lead_tau))
+        delta_tau_met_phi = ak.where(ntight_lep==2, lead_tau_vtight.delta_phi(p4_met), lead_tau_vtight.delta_phi(emu_met))
+        dilep_dphi_tau = ak.where(ntight_lep==2, dilep_p4.delta_phi(lead_tau_vtight), dilep_p4.delta_phi(lead_tau_vtight))
         delta_tau_loose_met_phi = ak.where(ntight_lep==2, lead_tau_loose.delta_phi(p4_met), lead_tau_loose.delta_phi(emu_met))
         dilep_dphi_tau_loose = ak.where(ntight_lep==2, dilep_p4.delta_phi(lead_tau_loose), dilep_p4.delta_phi(lead_tau_loose))
 
 
-        
+
         #Transverse WZ mass system 
         # Building 4 vector for tranverse mass calculation
         # .t is synonym for energy but there is a bug when we add option types of arrays of two leptons
-        dilep_loose_tau_met_p4 = dilep_p4 + lead_tau_loose + p4_met
+        dilep_loose_tau_met_p4 = dilep_p4 + lead_tau_for_vars + p4_met
         mT_WZ_square = ((dilep_loose_tau_met_p4.t**2) - (dilep_loose_tau_met_p4.pz**2))
         mT_WZ = np.sqrt(np.maximum(0, mT_WZ_square))
 
 
-        dilep_tau_loose_met_hadron_mt = np.sqrt((transverse_energy(lead_lep) + transverse_energy(subl_lep) + transverse_energy(lead_tau_loose) + p4_met.pt) ** 2 - dilep_loose_tau_met_p4.pt**2)
+        dilep_tau_loose_met_hadron_mt = np.sqrt((transverse_energy(lead_lep) + transverse_energy(subl_lep) + transverse_energy(lead_tau_for_vars) + p4_met.pt) ** 2 - dilep_loose_tau_met_p4.pt**2)
 
         inv_m_WZ = (dilep_loose_tau_met_p4).mass
 
 
         #tranverse W mass
-        tau_loose_met_p4 = lead_tau_loose + p4_met
+        tau_loose_met_p4 = lead_tau_for_vars + p4_met
         mT_W_square = ((tau_loose_met_p4.t)**2 - (tau_loose_met_p4.pz**2))
         mT_W = np.sqrt(np.maximum(0, mT_W_square))
 
@@ -883,20 +936,20 @@ class wzinclusive_processor(processor.ProcessorABC):
         # ST, scalar sum of all object pts
         ST = HTl + p4_met.pt
 
-        
+
         # 2jet and vbs related variables
         lead_jet = ak.firsts(good_jets)
         subl_jet = ak.firsts(good_jets[lead_jet.delta_r(good_jets)>0.01])
         third_jet = ak.firsts(good_jets[(lead_jet.delta_r(good_jets)>0.01) & (subl_jet.delta_r(good_jets)>0.01)])
         delta_R_jet_dilep = ak.where(ntight_lep==2, dilep_p4.delta_r(lead_jet), dilep_p4.delta_r(lead_jet))
-        delta_R_jet_tau = ak.where(ntight_lep==2, lead_tau.delta_r(lead_jet), lead_tau.delta_r(lead_jet))
+        delta_R_jet_tau = ak.where(ntight_lep==2, lead_tau_vtight.delta_r(lead_jet), lead_tau_vtight.delta_r(lead_jet))
         dphi_jet_met = ak.where(ntight_lep==2, lead_jet.delta_phi(p4_met), lead_jet.delta_phi(emu_met))
-        
+
         dijet_mass = (lead_jet + subl_jet).mass
         dijet_deta = np.abs(lead_jet.eta - subl_jet.eta)
         event['dijet_mass'] = dijet_mass
         event['dijet_deta'] = dijet_deta 
-        
+
         min_dphi_met_j = ak.min(np.abs(
             ak.where(
                 ntight_lep==3, 
@@ -904,9 +957,8 @@ class wzinclusive_processor(processor.ProcessorABC):
                 good_jets.delta_phi(p4_met)
             )
         ), axis=1)
-
         event['min_dphi_met_j'] = min_dphi_met_j
-        
+
         # define basic selection
         selection.add(
             "require-ossf",
@@ -925,26 +977,12 @@ class wzinclusive_processor(processor.ProcessorABC):
         selection.add(
             "require-2lep",
             (ntight_lep==2) & (nloose_lep==0) &
-            (ak.firsts(tight_lep).pt>25) &
-            ak.fill_none((lead_lep.pdgId + subl_lep.pdgId)==0, False)
-        )
-        # FIXME?: this is osof on the two leading electrons/muons, but third electron/muon too
-        selection.add(
-            "require-3lep",
-            (ntight_lep==3) & (nloose_lep==0) &
-            (ak.firsts(tight_lep).pt>25) &
-            ak.fill_none((lead_lep.pdgId + subl_lep.pdgId)==0, False)
-        )
-        # FIXME?: this is 2 tight leps osof + 2 loose or tight electrons/muons as well
-        selection.add(
-            "require-4lep",
-            (ntight_lep>=2) & (nloose_lep + ntight_lep)==4 &
-            (ak.firsts(tight_lep).pt>25) &
-            ak.fill_none((lead_lep.pdgId + subl_lep.pdgId)==0, False)
+            (ak.firsts(tight_lep).pt>25) 
         )
 
         selection.add('met_pt', ak.fill_none((reco_met_pt > 30), False))
         selection.add('low_met_pt', ak.fill_none((reco_met_pt < 20) & (reco_met_pt > 0), False))
+        selection.add('val_met_pt', ak.fill_none((reco_met_pt < 30) & (reco_met_pt > 20), False))
         selection.add('dilep_m'   , ak.fill_none(np.abs(dilep_m - self.zmass) < 15, False))
         selection.add('dilep_pt', ak.fill_none(dilep_pt > 30, False))
         selection.add("dilep_dphi_met", ak.fill_none(np.abs(dilep_dphi_met)>1.0, False))
@@ -964,17 +1002,21 @@ class wzinclusive_processor(processor.ProcessorABC):
         selection.add('0njets' , ngood_jets  == 0 )
         selection.add('1njets' , ngood_jets  <= 1 )
         selection.add('1njets_only' , ngood_jets  == 1 )
-        selection.add('2njets' , ngood_jets  <= 2 )
-        selection.add('3njets' , ngood_jets  >= 3 )
-        selection.add('0nbjets', ngood_bjets == 0 )
-        selection.add('nbjets', ngood_bjets >= 1 )
-        selection.add('1nhtaus', nhtaus_lep  == 1 )
-        selection.add('1nhtaus_loose', nhtaus_lep_loose  == 1 )
+        # selection.add('0nbjets', ngood_bjets == 0 )
+        # selection.add('nbjets', ngood_bjets >= 1 )
+        selection.add('1nhtaus_vtight', nhtaus_lep_vtight  == 1 )
         selection.add('1nhtaus_tight', nhtaus_lep_tight  == 1 )
-        
-        selection.add('dijet_deta', ak.fill_none(dijet_deta > 2.5, False))
-        selection.add('dijet_mass_400' , ak.fill_none(dijet_mass >  400, False))
-        selection.add('dijet_mass_800' , ak.fill_none(dijet_mass >  800, False))
+        selection.add('1nhtaus_loose', nhtaus_lep_loose  == 1 )
+        selection.add('2plusnhtaus_vtight', nhtaus_lep_vtight  >= 2 )
+        selection.add('2plusnhtaus_tight', nhtaus_lep_tight  >= 2 )
+        selection.add('2plusnhtaus_loose', nhtaus_lep_loose  >= 2 )
+        selection.add('lead_tau_plus', lead_tau_plus_tag )
+        selection.add('lead_tau_minus', lead_tau_minus_tag )
+        # selection.add('1nhtaus_plus', nhtaus_plus == 1)
+        # selection.add('1nhtaus_minus', nhtuaus_minus == 1)
+        # selection.add('1nhtaus_loose_plus', nhtaus_loose_plus == 1)
+        # selection.add('1nhtaus_loose_minus', nhtaus_loose_minus == 1)
+
 
         # Define all variables for the BDT
         event['met_pt'  ] = ak.fill_none(reco_met_pt,-99)
@@ -991,10 +1033,10 @@ class wzinclusive_processor(processor.ProcessorABC):
         event['ST'] = ak.fill_none(ST,-99)
         event['dilep_dphi'] = ak.fill_none(dilep_dphi,-99)
         event['njets'   ] = ak.fill_none(ngood_jets,-99)
-        event['nbjets'   ] = ak.fill_none(ngood_bjets,-99)
-        event['ntaus_vtight'   ] = ak.fill_none(nhtaus_lep,-99)
-        event['ntaus_tight'   ] = ak.fill_none(nhtaus_lep_tight,-99)
-        event['ntaus_loose'   ] = ak.fill_none(nhtaus_lep_loose,-99)
+        # event['nbjets'   ] = ak.fill_none(ngood_bjets,-99)
+        event['nhtaus_vtight'   ] = ak.fill_none(nhtaus_lep_vtight,-99)
+        event['nhtaus_tight'   ] = ak.fill_none(nhtaus_lep_tight,-99)
+        event['nhtaus_loose'   ] = ak.fill_none(nhtaus_lep_loose,-99)
         event['dphi_met_ll'] = ak.fill_none(dilep_dphi_met,-99)
         event['dilep_dphi_tau'] = ak.fill_none(dilep_dphi_tau,-99)
         event['dijet_mass'] = ak.fill_none(dijet_mass,-99)
@@ -1037,16 +1079,20 @@ class wzinclusive_processor(processor.ProcessorABC):
             # self._btag.append_btag_sf(jets, weights)
             self._jpSF.append_jetPU_sf(good_jets, weights)
             self._purw.append_pileup_weight(weights, event.Pileup.nTrueInt) # fix: https://github.com/9GaoHong/SMQawa_update/commit/d6cdebda4856593162c03365eb9d9a91ceb1a185
-            self._tauID.append_tauID_sf(had_taus, weights)
+            self._tauID.append_tauID_multiwp_sf(had_taus, had_taus_tight, had_taus_loose,
+                                                tau_mask_vtight, tau_mask_tight, tau_mask_loose,
+                                                weights
+                                                )
+
             self._add_trigger_sf(weights, lead_lep, subl_lep)
-            
+
             weights.add (
                     'LeptonSF', 
                     lead_lep.SF*subl_lep.SF, 
                     lead_lep.SF_up*subl_lep.SF_up, 
                     lead_lep.SF_down*subl_lep.SF_down
             )
-            
+
             if self.ewk_process_name:
                 self.ewk_corr.get_weight(
                         event.GenPart,
@@ -1056,12 +1102,12 @@ class wzinclusive_processor(processor.ProcessorABC):
                 )
             else:
                 weights.add("kEW", _ones, _ones, _ones)
-            
+
             if "PSWeight" in event.fields:
                 theory_ps_weight(weights, event.PSWeight)
             else:
                 theory_ps_weight(weights, None)
-            
+
             if "LHEPdfWeight" in event.fields:
                 theory_pdf_weight(weights, event.LHEPdfWeight)
             else:
@@ -1082,11 +1128,11 @@ class wzinclusive_processor(processor.ProcessorABC):
                     weights.add('QCDScale2w'  , _ones, event.LHEScaleWeight[:, 0], event.LHEScaleWeight[:, 16])
                 else:
                     coffea_console.print("WARNING: QCD scale variation type not recongnised ... ")
-                
+
             if 'LHEReweightingWeight' in event.fields and 'aQGC' in dataset:
                 for i in range(1057):
                     weights.add(f"eft_{self._eftnames[i]}", event.LHEReweightingWeight[:, i])
-            
+
             # 2017 Prefiring correction weight
             if 'L1PreFiringWeight' in event.fields:
                 weights.add("prefiring_weight", event.L1PreFiringWeight.Nom, event.L1PreFiringWeight.Dn, event.L1PreFiringWeight.Up)
@@ -1099,62 +1145,99 @@ class wzinclusive_processor(processor.ProcessorABC):
         common_sel = ['triggers', 'lumimask', 'metfilter']
         channels = {
             "inc-SR0": common_sel + [
-            'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', '0njets', '1nhtaus', 'met_pt', 'dilep_pt'
+                'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '0njets', '1nhtaus_vtight', '~2plusnhtaus_tight', 'met_pt',
         ],
             "inc-SR1": common_sel + [
-            'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', '1njets_only', '1nhtaus' ,'met_pt', 'dilep_pt'
+                'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '1njets_only', '1nhtaus_vtight' ,'met_pt',
         ],
         #     "inc-SR1l": common_sel + [
-        #     'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', '1njets_only', '1nhtaus' ,'met_pt', 'dilep_pt', '0nbjets'
+        #         'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '1njets_only', '1nhtaus_vtight' ,'met_pt', '0nbjets'
         # ],
         #     "inc-SR1b": common_sel + [
-        #     'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', '1njets_only', '1nhtaus' ,'met_pt', 'dilep_pt', '~0nbjets'
+        #         'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '1njets_only', '1nhtaus_vtight' ,'met_pt', '~0nbjets'
         # ],
-            "inc-SR01": common_sel + [
-            'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', '1njets', '1nhtaus', 'met_pt', 'dilep_pt'
+        #     "inc-SR01": common_sel + [
+        #         'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '1njets', '1nhtaus_vtight', '~2plusnhtaus_tight', 'met_pt'
+        # ],
+        #     "inc-EM0": common_sel + [
+        #         'require-osof', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '0njets', '1nhtaus_vtight', '~2plusnhtaus_tight', 'met_pt'
+        # ],
+        #     "inc-EM1": common_sel + [
+        #         'require-osof', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '1njets_only', '1nhtaus_vtight', '~2plusnhtaus_tight', 'met_pt'
+        # ],
+            "inc-VR0": common_sel + [
+                'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '0njets', '1nhtaus_vtight', '~2plusnhtaus_tight', 'val_met_pt'
         ],
-            "inc-DY0": common_sel + [
-            'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'met_pt','dilep_pt', '0njets',  '~1nhtaus', '1nhtaus_loose', '~1nhtaus_tight'
+            "inc-VR1": common_sel + [
+                'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '1njets_only', '1nhtaus_vtight' , 'val_met_pt'
         ],
-            "inc-DY1": common_sel + [
-            'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'met_pt','dilep_pt', '1njets_only', '~1nhtaus', '1nhtaus_loose', '~1nhtaus_tight'
-        ],
-            "inc-EM0": common_sel + [
-            'require-osof', 'dilep_m', 'dilep_pt', 'dilep_dphi_met', '1nhtaus', 'met_pt', '0njets'
-        ],
-            "inc-EM1": common_sel + [
-            'require-osof', 'dilep_m', 'dilep_pt', 'dilep_dphi_met', '1nhtaus', 'met_pt', '1njets_only'
+        #     "inc-VR01": common_sel + [
+        #         'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '1njets', '1nhtaus_vtight' , 'val_met_pt'
+        # ],
+            "inc-VB0": common_sel + [
+                'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '0njets', '1nhtaus_loose', '~1nhtaus_tight', '~1nhtaus_vtight', 'val_met_pt'
         ],
 
+            "inc-VB1": common_sel + [
+                'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '1njets_only', '1nhtaus_loose', '~1nhtaus_tight', '~1nhtaus_vtight', 'val_met_pt'
+        ],
+            # "inc-B0" is identical to "inc-DY0"
             "inc-B0": common_sel + [
-            'require-ossf', 'require-2lep', 'dilep_m', 'dilep_pt', 'dilep_dphi_met', '1nhtaus_loose', 'met_pt', '0njets', '~1nhtaus_tight', '~1nhtaus'
+                'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '0njets', '1nhtaus_loose', '~1nhtaus_tight', '~1nhtaus_vtight', 'met_pt'
         ],
-
-            "inc-C0": common_sel + [
-            'require-ossf', 'require-2lep', 'dilep_m', 'dilep_pt', 'dilep_dphi_met', 'low_met_pt', '1nhtaus_loose', '0njets', '~1nhtaus_tight', '~1nhtaus'
-        ],
-
-            "inc-D0": common_sel + [
-            'require-ossf', 'require-2lep', 'dilep_m', 'dilep_pt', 'dilep_dphi_met', 'low_met_pt', '1nhtaus', '0njets'
-        ],
-
+            # "inc-B1" is identical to "inc-DY1"
             "inc-B1": common_sel + [
-            'require-ossf', 'require-2lep', 'dilep_m', 'dilep_pt', 'dilep_dphi_met', '1nhtaus_loose', 'met_pt', '1njets_only', '~1nhtaus_tight', '~1nhtaus'
+                'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '1njets_only', '1nhtaus_loose', '~1nhtaus_tight', '~1nhtaus_vtight', 'met_pt'
         ],
-
+        #     "inc-B01": common_sel + [
+        #         'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '1njets', '1nhtaus_loose', '~1nhtaus_tight', '~1nhtaus_vtight', 'met_pt'
+        # ],
+            "inc-C0": common_sel + [
+                'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', 'low_met_pt', '1nhtaus_loose', '0njets', '~1nhtaus_tight', '~1nhtaus_vtight'
+        ],
             "inc-C1": common_sel + [
-            'require-ossf', 'require-2lep', 'dilep_m', 'dilep_pt', 'dilep_dphi_met', 'low_met_pt', '1nhtaus_loose', '1njets_only', '~1nhtaus_tight', '~1nhtaus'
+                'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', 'low_met_pt', '1nhtaus_loose', '1njets_only', '~1nhtaus_tight', '~1nhtaus_vtight'
         ],
-
+            "inc-D0": common_sel + [
+                'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '0njets', '1nhtaus_vtight', '~2plusnhtaus_tight', 'low_met_pt'
+        ],
             "inc-D1": common_sel + [
-            'require-ossf', 'require-2lep', 'dilep_m', 'dilep_pt', 'dilep_dphi_met', 'low_met_pt', '1nhtaus', '1njets_only'
+                'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '1njets_only', '1nhtaus_vtight', '~2plusnhtaus_tight', 'low_met_pt'
+        ],
+            "inc-IR0L": common_sel + [
+                'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '0njets', '1nhtaus_tight', '~2plusnhtaus_loose', '~1nhtaus_vtight', 'low_met_pt'
+        ],
+            "inc-IR1L": common_sel + [
+                'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '1njets_only', '1nhtaus_tight', '~2plusnhtaus_loose', '~1nhtaus_vtight', 'low_met_pt'
+        ],
+        #     "inc-IR0M": common_sel + [
+        #         'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '0njets', '1nhtaus_tight', '~2plusnhtaus_loose', '~1nhtaus_vtight', 'val_met_pt'
+        # ],
+
+        #     "inc-IR1M": common_sel + [
+        #         'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '1njets_only', '1nhtaus_tight', '~2plusnhtaus_loose', '~1nhtaus_vtight', 'val_met_pt'
+        # ],
+            "inc-IR0H": common_sel + [
+                'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '0njets', '1nhtaus_tight', '~2plusnhtaus_loose', '~1nhtaus_vtight', 'met_pt'
         ],
 
-            "inc-B01": common_sel + [
-            'require-ossf', 'require-2lep', 'dilep_m', 'dilep_pt', 'dilep_dphi_met', '1nhtaus_loose', 'met_pt', '1njets', '~1nhtaus_tight', '~1nhtaus'
-        ],
+            "inc-IR1H": common_sel + [
+                'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '1njets_only', '1nhtaus_tight', '~2plusnhtaus_loose', '~1nhtaus_vtight', 'met_pt'
+        ],            
+
         }
-            
+
+        if self._split_by_charge:
+            charged_channels = {}
+            for channel, reqs in channels.items():
+                reqs_plus = reqs + ["lead_tau_plus"]
+                reqs_minus = reqs + ["lead_tau_minus"]
+                charged_channels[f"{channel}+"] = reqs_plus
+                charged_channels[f"{channel}-"] = reqs_minus
+            # Replace channels with charge-separated channels
+            channels = charged_channels
+
+
         def _format_variable(variable, cut):
             if cut is None:
                 vv = ak.to_numpy(ak.fill_none(variable, np.nan))
@@ -1171,7 +1254,7 @@ class wzinclusive_processor(processor.ProcessorABC):
             longest_field = max([len(field) for field in collection.fields])
             for field in collection.fields:
                 coffea_console.print(f"\t{field:<{longest_field}}={getattr(collection, field)}")
-        
+
         def _histogram_filler(ch, syst, var, _weight=None):
             sel_ = channels[ch]
             sel_args_ = {
@@ -1180,7 +1263,7 @@ class wzinclusive_processor(processor.ProcessorABC):
             cut =  selection.require(**sel_args_)
 
             systname = 'nominal' if syst is None else syst
-            
+
             if _weight is None: 
                 if syst in weights.variations:
                     weight = weights.weight(modifier=syst)[cut]
@@ -1188,7 +1271,7 @@ class wzinclusive_processor(processor.ProcessorABC):
                     weight = weights.weight()[cut]
             else:
                 weight = weights.weight()[cut] * _weight[cut]
-            
+
             vv = ak.to_numpy(ak.fill_none(weight, np.nan))
             if np.isnan(np.any(vv)):
                 coffea_console.print(f" - {syst} weight contains invalid values:", vv[np.isnan(vv)], vv[np.isinf(vv)])
@@ -1218,7 +1301,7 @@ class wzinclusive_processor(processor.ProcessorABC):
             cut =  selection.require(**sel_args_)
 
             systname = 'nominal' if syst is None else syst
-            
+
             if _weight is None: 
                 if syst in weights.variations:
                     weight = weights.weight(modifier=syst)[cut]
@@ -1226,7 +1309,7 @@ class wzinclusive_processor(processor.ProcessorABC):
                     weight = weights.weight()[cut]
             else:
                 weight = weights.weight()[cut] * _weight[cut]
-            
+
             vv = ak.to_numpy(ak.fill_none(weight, np.nan))
             if np.isnan(np.any(vv)):
                 coffea_console.print(f" - {syst} weight contains invalid values:", vv[np.isnan(vv)], vv[np.isinf(vv)])
@@ -1244,7 +1327,7 @@ class wzinclusive_processor(processor.ProcessorABC):
             systematics = [None] + list(weights.variations)
         else:
             systematics = [shift_name]
-            
+
         for ch in channels:
             for sys in systematics:
                 _histogram_filler(ch, sys, 'leading_lep_pt')
@@ -1265,10 +1348,10 @@ class wzinclusive_processor(processor.ProcessorABC):
                 _histogram_filler(ch, sys, 'lead_jet_phi')
                 _histogram_filler(ch, sys, 'lead_jet_eta')
                 _histogram_filler(ch, sys, 'njets')
-                _histogram_filler(ch, sys, 'nbjets')
-                _histogram_filler(ch, sys, 'ntaus_loose')
-                _histogram_filler(ch, sys, 'ntaus_tight')
-                _histogram_filler(ch, sys, 'ntaus_vtight')
+                # _histogram_filler(ch, sys, 'nbjets')
+                _histogram_filler(ch, sys, 'nhtaus_loose')
+                _histogram_filler(ch, sys, 'nhtaus_tight')
+                _histogram_filler(ch, sys, 'nhtaus_vtight')
                 _histogram_filler(ch, sys, 'dilep_pt')
                 _histogram_filler(ch, sys, 'dilep_dphi')
                 _histogram_filler(ch, sys, 'dilep_deta')
@@ -1296,20 +1379,20 @@ class wzinclusive_processor(processor.ProcessorABC):
                 _histogram_filler(ch, sys, 'delta_R_non_iso_lep_vtight_tau')
 
         return {dataset: histos}
-        
+
     def process(self, event):
         dataset_name = event.metadata['dataset']
         is_data = event.metadata.get("is_data")
-        
+
 
         # JES/JER corrections
         rho = event.fixedGridRhoFastjetAll
         cache = {}
 
-        
+
         raw_met = event.RawMET
         met_to_correct = event.MET
-       
+
         jets = self._jmeu.corrected_jets_L123_JER(event.Jet, event.fixedGridRhoFastjetAll, cache)
         jets_to_correct_met = self._jmeu.corrected_jets_L123_noJER(event.Jet, event.fixedGridRhoFastjetAll, cache)
         met = self._jmeu.corrected_met(met_to_correct, jets, event.fixedGridRhoFastjetAll, cache) # we are adding fully smeared L123 jets
@@ -1319,11 +1402,11 @@ class wzinclusive_processor(processor.ProcessorABC):
         event = ak.with_field(event, jets, 'Jet')
         event = ak.with_field(event, jets_to_correct_met, 'JetforMET')
         event = ak.with_field(event, met, 'MET')
-        
+
 
         run = event.run 
         npv = event.PV.npvs
-        
+
         met = met_phi_xy_correction(
             event.MET, run, npv, 
             is_mc=not is_data, 
@@ -1331,9 +1414,9 @@ class wzinclusive_processor(processor.ProcessorABC):
         )
         event = ak.with_field(event, met, 'MET')
 
-    
+
         if is_data:
-            
+
             # Apply rochester_correction
             muon = event.Muon 
             muon_pt,muon_pt_roccorUp,muon_pt_roccorDown=rochester_correction(is_data).apply_rochester_correction (muon)
@@ -1342,13 +1425,13 @@ class wzinclusive_processor(processor.ProcessorABC):
 
             return self.process_shift(event, None)
 
-        
+
         # Adding scale factors to Muon and Electron fields
         muon = event.Muon 
         electron = event.Electron
         muonSF_nom, muonSF_up, muonSF_down = self._leSF.muonSF(muon)
         elecSF_nom, elecSF_up, elecSF_down = self._leSF.electronSF(electron)
-        
+
         muon['SF'] = muonSF_nom
         muon['SF_up'] = muonSF_up
         muon['SF_down'] = muonSF_down
@@ -1360,18 +1443,18 @@ class wzinclusive_processor(processor.ProcessorABC):
         event = ak.with_field(event, muon, 'Muon')
         event = ak.with_field(event, electron, 'Electron')
 
-        
+
         # Apply rochester_correction
         muon=event.Muon
         muonEnUp=event.Muon
         muonEnDown=event.Muon
-        muon_pt,muon_pt_roccorUp,muon_pt_roccorDown=rochester_correction(is_data).apply_rochester_correction (muon)
-        
+        muon_pt, muon_pt_roccorUp, muon_pt_roccorDown=rochester_correction(is_data).apply_rochester_correction(muon)
+
         muon['pt'] = muon_pt
         muonEnUp['pt'] = muon_pt_roccorUp
         muonEnDown['pt'] = muon_pt_roccorDown 
         event = ak.with_field(event, muon, 'Muon')
-        
+
         # Electron corrections
         electronEnUp=event.Electron
         electronEnDown=event.Electron
@@ -1395,7 +1478,7 @@ class wzinclusive_processor(processor.ProcessorABC):
         tauEnDown['mass'] = tau_mass_EnDown
         event = ak.with_field(event, tau, 'Tau')
 
-    
+
         # define all the shifts
         shifts = [
             # Jets
@@ -1430,14 +1513,14 @@ class wzinclusive_processor(processor.ProcessorABC):
             ({"Jet": getattr(jets,f'JES_RelativeSample_{self._era}').up  , "MET": getattr(met,f'JES_RelativeSample_{self._era}').up   }, f"JES_RelativeSample{self._era}Up"  ),
             ({"Jet": getattr(jets,f'JES_RelativeSample_{self._era}').down, "MET": getattr(met,f'JES_RelativeSample_{self._era}').down }, f"JES_RelativeSample{self._era}Down"),
 
-            
-            # Electrons + MET shift (FIXME: shift to be added)
+
+            # Electrons + MET shift (FIXME: correlated MET shift to be added)
             ({"Electron": electronEnUp  }, "ElectronEnUp"  ),
             ({"Electron": electronEnDown}, "ElectronEnDown"),
-            # Muon + MET shifts
+            # Muons + MET shift (FIXME: correlated MET shift to be added)
             ({"Muon": muonEnUp  }, "MuonRocUp"),
             ({"Muon": muonEnDown}, "MuonRocDown"),
-            # Tau + MET shifts
+            # Taus + MET shift (FIXME: correlated MET shift to be added)
             ({"Tau": tauEnUp  }, "TauEnUp"),
             ({"Tau": tauEnDown}, "TauEnDown"),
 
@@ -1458,9 +1541,9 @@ class wzinclusive_processor(processor.ProcessorABC):
             ) for collections, name in shifts
         ]
         return processor.accumulate(shifts)
-    
 
-    
+
+
     def postprocess(self, accumulator):
         return accumulator
 

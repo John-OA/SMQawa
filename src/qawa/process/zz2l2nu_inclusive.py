@@ -76,20 +76,24 @@ def build_leptons(muons, electrons):
     return tight_leptons, nloose 
 
 def build_htaus(tau, lepton):
-    base = (
+    
+    base_selection = (
         (tau.pt         > 20 ) &
         (np.abs(tau.eta)< 2.3 ) &
+        (np.abs(tau.dz)< 0.2 ) &
         (tau.decayMode != 5   ) &
         (tau.decayMode != 6   ) &
-        (tau.idDeepTau2017v2p1VSe >= 2) &
-        (tau.idDeepTau2017v2p1VSmu >= 1) &
-        (tau.idDeepTau2017v2p1VSjet >= 16)
+        (tau.idDeepTau2017v2p1VSe >= 32) & # 32 is Tight for electron
+        (tau.idDeepTau2017v2p1VSmu >= 8) & # 8 is Tight for muon
+        (tau.idDeepTau2017v2p1VSjet >= 16) #these are nested bit set but we can still target the exact value of an ID; 16 is Medium
     )
+
     overlap_leptons = ak.any(
         tau.metric_table(lepton) <= 0.4,
         axis=2
     )
-    return tau[base & ~overlap_leptons]
+
+    return tau[base_selection & ~overlap_leptons]
 
 def build_jets(jets, tight_leptons, taus_loose, btag_wp, era, isAPV):
 
@@ -206,8 +210,8 @@ class zzinc_processor(processor.ProcessorABC):
         self.btag_wp = 'M'
         self.jetPU_wp = 'M'
         self.tauIDvsjet_wp = 'Medium'
-        self.tauIDvse_wp = 'VVLoose'
-        self.tauIDvsmu_wp = 'VLoose'
+        self.tauIDvse_wp = 'Tight'
+        self.tauIDvsmu_wp = 'Tight'
         self.zmass = 91.1873 # GeV 
         self._btag = BTVCorrector(era=self._era, wp=self.btag_wp, isAPV=self._isAPV)
         self._jmeu = JMEUncertainty(jec_tag, jer_tag, era=self._era, is_mc=(len(run_period)==0))
