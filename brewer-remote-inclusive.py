@@ -125,7 +125,7 @@ def main():
         try:
             file_name = options.infile
             if '/store/' in options.infile:
-                if options.infile.startswith("root://"):
+                if options.infile.startswith("root://") or options.infile.startswith("file:"):
                     pass
                 else:
                     file_name = aliases[ixrd] + options.infile
@@ -163,7 +163,7 @@ def main():
                 'era': era,
                 'is_data': is_data
             }
-            runs_files = {local_file_name: "Runs" if local_file_name else file_name}
+            runs_files = {local_file_name: "Runs"} if local_file_name else {file_name: "Runs"}
             runs_samples ={
                 options.dataset:{
                     'files': runs_files,
