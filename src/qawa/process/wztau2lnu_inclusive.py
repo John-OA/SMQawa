@@ -384,10 +384,14 @@ class wzinclusive_processor(processor.ProcessorABC):
         with open(f'{_data_path}/eft-names.dat') as eft_file:
             self._eftnames = [n.strip() for n in eft_file.readlines()]
 
-        with uproot.open(f'{_data_path}/trigger_sf/histo_triggerEff_sel0_{self._era}.root') as _fn:
-            _hvalue = np.dstack([_fn[_hn].values() for _hn in _fn.keys()] + [np.ones((7,7))])
-            _herror = np.dstack([np.sqrt(_fn[_hn].variances()) for _hn in _fn.keys()] + [np.zeros((7,7))])
-            self.trig_sf_map = np.stack([_hvalue, _herror], axis=-1)
+        if self.clibhandler is not None and "trigger_sf" in self.clibhandler.keys():
+            # We have trigger_sf in correctionlib, skip loading from root files
+            pass
+        else:
+            with uproot.open(f'{_data_path}/trigger_sf/histo_triggerEff_sel0_{self._era}.root') as _fn:
+                _hvalue = np.dstack([_fn[_hn].values() for _hn in _fn.keys()] + [np.ones((7,7))])
+                _herror = np.dstack([np.sqrt(_fn[_hn].variances()) for _hn in _fn.keys()] + [np.zeros((7,7))])
+                self.trig_sf_map = np.stack([_hvalue, _herror], axis=-1)
 
         self.ewk_process_name = ewk_process_name
         self.beam_energy = self.com * 1000 / 2
