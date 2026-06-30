@@ -1295,7 +1295,17 @@ class wzinclusive_processor(processor.ProcessorABC):
         else:
             # If systematic variations are needed, they must be manually inserted here to give different DD estimates; they should be picked up later for histos.
             weights.add("datadriven_DDDYNominal", _ones, self._dd.estimate_dd_DY(ngood_jets, tau_pt_loose, systematic="nominal"), self._dd.estimate_dd_DY(ngood_jets, tau_pt_loose, systematic="nominal"))  #added nominal value twice to avoid getting 1/up for the nominaldown
-            weights.add("datadriven_DDDY",_ones, self._dd.estimate_dd_DY(ngood_jets, tau_pt_loose, "DDDYUp"), self._dd.estimate_dd_DY(ngood_jets, tau_pt_loose, "DDDYDown"))
+            if self._dd.stat_systematics:
+                # Averaged (multi-era) estimate: one decorrelated statistical nuisance per era (stat_{era})
+                for _stat in self._dd.stat_systematics:
+                    weights.add(f"datadriven_{_stat}", _ones, self._dd.estimate_dd_DY(ngood_jets, tau_pt_loose, f"{_stat}Up"), self._dd.estimate_dd_DY(ngood_jets, tau_pt_loose, f"{_stat}Down"))
+            else:
+                # Legacy single-era estimate: a single combined statistical nuisance
+                weights.add("datadriven_DDDY",_ones, self._dd.estimate_dd_DY(ngood_jets, tau_pt_loose, "DDDYUp"), self._dd.estimate_dd_DY(ngood_jets, tau_pt_loose, "DDDYDown"))
+            # Propagated MC systematics from the non-DY subtraction, added under their bare source
+            # names so they correlate with the same-named analysis nuisances on the MC.
+            for _mcsyst in self._dd.mc_systematics:
+                weights.add(_mcsyst, _ones, self._dd.estimate_dd_DY(ngood_jets, tau_pt_loose, f"{_mcsyst}Up"), self._dd.estimate_dd_DY(ngood_jets, tau_pt_loose, f"{_mcsyst}Down"))
         # selections (delta_tau_met_phi cut is removed from SR)
 
         common_sel = ['triggers', 'lumimask', 'metfilter']
