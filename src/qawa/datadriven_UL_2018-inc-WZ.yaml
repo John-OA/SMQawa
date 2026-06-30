@@ -1,3 +1,7 @@
+# era label used to name the per-era statistical nuisance (stat_{era}) when averaging
+# across multiple config files (one per era). Each config passed to --input should set this.
+era: 2018
+
 boosthist:
   # - ./data/merged-histogram-WZ-2018-Inc_WZ_lateset_alltau_jet_separation.pkl.gz
   # - ./data/merged-histogram-WZ-2018-Inc_WZ_l_and_b_jet_separation.pkl.gz

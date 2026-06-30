@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import hist
 import rich
+from hist.intervals import ratio_uncertainty
 from typing import Dict, List, Tuple, Optional
 import warnings
 
@@ -13,8 +14,10 @@ import warnings
 class DataDrivenEventReweight:
     """Reweight events using data-driven fake tau rate and P(DY) corrections."""
 
-    def __init__(self, era: str = "2018", estimator=None):
-        _data_path = Path(os.path.dirname(__file__)) / f"data/dd/{era}/WZ_inclusive_data_driven_{era}.json"
+    def __init__(self, era: str = "2018", estimator=None, path=None):
+        if path is None:
+            path = Path(os.path.dirname(__file__)) / f"data/dd/{era}/WZ_inclusive_data_driven_{era}.json"
+        _data_path = Path(path)
         assert _data_path.exists(), f"DataDrivenEventReweight could not find the expected json file: {str(_data_path)}"
         self.dd_estimator = correctionlib.CorrectionSet.from_file(str(_data_path))
         if estimator is None:
@@ -102,9 +105,15 @@ def histogram_extractor(config,
 def inc_WZ_dddy_tf_ratio_and_uncertainty(data_hists, non_dy_mc_hists, data_syst:str = "", non_dy_mc_syst:str = "", numerator_key:str = "", denominator_key:str = ""):
     numerator = data_hists[numerator_key][{"systematic": data_syst}] + (-1)*non_dy_mc_hists[numerator_key][{"systematic": non_dy_mc_syst}]
     denominator = data_hists[denominator_key][{"systematic": data_syst}] + (-1)*non_dy_mc_hists[denominator_key][{"systematic": non_dy_mc_syst}]
-    ratio = numerator.values() / denominator.values()
-    ratio_unc = ratio_uncertainty(numerator.values(), denominator.values(), uncertainty_type="poisson")
-    return numerator, denominator, ratio, ratio_unc
+    num_v = numerator.values()
+    den_v = denominator.values()
+    # Guard empty bins (e.g. unpopulated high-tau_pt bins): a zero denominator must not bake
+    # NaN/inf into the correction content (correctionlib rejects non-finite values).
+    ratio = np.divide(num_v, den_v, out=np.zeros_like(den_v, dtype=float), where=den_v != 0)
+    ratio_unc_up, ratio_unc_down = ratio_uncertainty(num_v, den_v, uncertainty_type="poisson")
+    ratio_unc_up = np.nan_to_num(ratio_unc_up, nan=0.0, posinf=0.0, neginf=0.0)
+    ratio_unc_down = np.nan_to_num(ratio_unc_down, nan=0.0, posinf=0.0, neginf=0.0)
+    return numerator, denominator, ratio, (ratio_unc_up, ratio_unc_down)
 
 def inc_WZ_dddy_probdy_ratio_and_uncertainty(data_hists, dy_mc_hists, non_dy_mc_hists, data_syst:str = "", mc_syst:str = "", channel:str = "", probdy_method:str = "data_subtraction"):
     match probdy_method:
@@ -116,9 +125,195 @@ def inc_WZ_dddy_probdy_ratio_and_uncertainty(data_hists, dy_mc_hists, non_dy_mc_
             denominator = dy_mc_hists[channel][{"systematic": mc_syst}] + non_dy_mc_hists[channel][{"systematic": mc_syst}]
         case _:
             raise NotImplementedError(f"Unhandled probdy_method {probdy_method}")
-    ratio = numerator.values() / denominator.values()
-    ratio_unc = ratio_uncertainty(numerator.values(), denominator.values(), uncertainty_type="efficiency")
-    return numerator, denominator, ratio, ratio_unc
+    # P(DY) is a probability in [0, 1]. A negative *total* non-DY MC in a bin (from negative
+    # MC weights / over-subtraction) drives the raw numerator above the denominator, which is
+    # unphysical and illegal for the binomial (efficiency) interval. Clamp the counts to
+    # 0 <= numerator <= denominator before forming the ratio and its uncertainty (such bins
+    # become P(DY) -> 1, i.e. effectively all Drell-Yan).
+    num_v = np.clip(numerator.values(), 0.0, None)
+    den_v = np.clip(denominator.values(), 0.0, None)
+    num_v = np.minimum(num_v, den_v)
+    ratio = np.divide(num_v, den_v, out=np.zeros_like(den_v, dtype=float), where=den_v > 0)
+    ratio_unc_up, ratio_unc_down = ratio_uncertainty(num_v, den_v, uncertainty_type="efficiency")
+    ratio_unc_up = np.nan_to_num(ratio_unc_up, nan=0.0, posinf=0.0, neginf=0.0)
+    ratio_unc_down = np.nan_to_num(ratio_unc_down, nan=0.0, posinf=0.0, neginf=0.0)
+    return numerator, denominator, ratio, (ratio_unc_up, ratio_unc_down)
+
+def _prepare_method_hists(histogroups, ddcorrconfig):
+    """Build per-channel data / DY / non-DY MC / template boost histograms for a single
+    era's correction, plus the sorted list of MC systematic variations present."""
+    from dctools import update_axes_meta
+    data_hists, dy_mc_hists, non_dy_mc_hists, template_hists = {}, {}, {}, {}
+    mc_systematics = None
+    for channel in histogroups:
+        data_hists[channel] = histogroups[channel]["datasets"]["data"].to_boost()
+        dy_mc_hists[channel] = histogroups[channel]["datasets"]["DY"].to_boost()
+        # Drop empty (0-dim) group histograms before summing: a background group that has no
+        # entries in this region contributes zero, but summing a 0-dim hist (especially first)
+        # collapses the result and discards the systematic axis. Skipping them makes the sum
+        # order-independent and robust to a single background missing a region.
+        non_dy_components = [v.to_boost() for k, v in histogroups[channel]["datasets"].items() if k not in ["data", "DY"]]
+        non_dy_components = [h for h in non_dy_components if len(h.axes) > 0]
+        if not non_dy_components:
+            raise RuntimeError(f"No non-DY MC backgrounds with entries found in region '{channel}' for this config; "
+                               f"cannot perform the data-driven subtraction (the region appears to be missing in the histograms)")
+        non_dy_mc_hists[channel] = sum(non_dy_components)
+        template_hists[channel] = update_axes_meta(
+            data_hists[channel].project(*[ax.name for ax in data_hists[channel].axes if ax.name != "systematic"]).copy().reset(),
+            ddcorrconfig.update_axes_meta,
+        )
+        if mc_systematics is None:
+            mc_systematics = sorted([x for x in non_dy_mc_hists[channel].axes["systematic"]])
+    return data_hists, dy_mc_hists, non_dy_mc_hists, template_hists, mc_systematics
+
+
+def compute_era_correction(histogroups, ddcorrconfig, probdy_method):
+    """Compute the per-bin ratios for a single era / config for one Correction.
+
+    Returns a dict::
+
+        {
+            "ratios": { axis_key: { syst: {"ratio": .., "unc_up": .., "unc_down": ..} } },
+            "template": <1D template hist over the observable>,
+            "is_probdy": bool,
+        }
+
+    Only the ``"nominal"`` syst entry carries ``unc_up``/``unc_down`` (the statistical
+    uncertainty of the ratio); MC systematic entries carry only ``"ratio"``. The
+    averaging / stat handling across eras is done later in ``combine_era_corrections``.
+    """
+    data_hists, dy_mc_hists, non_dy_mc_hists, template_hists, mc_systematics = _prepare_method_hists(histogroups, ddcorrconfig)
+    ratios = {}
+    is_probdy = False
+    match ddcorrconfig.method:
+        case "inc_WZ_DYDD_TransferFactor":
+            for axis_key, num_den_dict in ddcorrconfig.channel_ratios.items():
+                numerator_key, denominator_key = num_den_dict["numerator"], num_den_dict["denominator"]
+                per_syst = {}
+                for mc_syst in mc_systematics:
+                    _, _, ratio, (ratio_unc_up, ratio_unc_down) = inc_WZ_dddy_tf_ratio_and_uncertainty(
+                        data_hists,
+                        non_dy_mc_hists,
+                        data_syst="nominal",
+                        non_dy_mc_syst=mc_syst,
+                        numerator_key=numerator_key,
+                        denominator_key=denominator_key,
+                    )
+                    if mc_syst == "nominal":
+                        per_syst["nominal"] = {"ratio": ratio, "unc_up": ratio_unc_up, "unc_down": ratio_unc_down}
+                    else:
+                        per_syst[mc_syst] = {"ratio": ratio}
+                ratios[axis_key] = per_syst
+        case "inc_WZ_DYDD_ProbDY":
+            is_probdy = True
+            for axis_key, channel in ddcorrconfig.channel_absolutes.items():
+                per_syst = {}
+                for mc_syst in mc_systematics:
+                    _, _, ratio, (ratio_unc_up, ratio_unc_down) = inc_WZ_dddy_probdy_ratio_and_uncertainty(
+                        data_hists,
+                        dy_mc_hists,
+                        non_dy_mc_hists,
+                        data_syst="nominal",
+                        mc_syst=mc_syst,
+                        channel=channel,
+                        probdy_method=probdy_method,
+                    )
+                    if mc_syst == "nominal":
+                        per_syst["nominal"] = {"ratio": ratio, "unc_up": ratio_unc_up, "unc_down": ratio_unc_down}
+                    else:
+                        per_syst[mc_syst] = {"ratio": ratio}
+                ratios[axis_key] = per_syst
+        case _:
+            raise NotImplementedError(f"Unknown method for data driven correction {ddcorrconfig.method}")
+    # All channel templates share binning after update_axes_meta; any one suffices for projection.
+    template = next(iter(template_hists.values()))
+    return {"ratios": ratios, "template": template, "is_probdy": is_probdy}
+
+
+def _axes_signature(h):
+    return [(ax.name, tuple(np.asarray(getattr(ax, "edges", [])).tolist())) for ax in h.axes]
+
+
+def combine_era_corrections(per_era_ratios, eras, lumis, templates, is_probdy):
+    """Luminosity-weighted average of per-era ratios into a single Correction's slices.
+
+    - nominal      : sum_e(L_e * r_e) / sum_e(L_e), with the (quadrature) combined stat
+                     stored in the variance slot for reference.
+    - stat_{era}   : the combination recomputed with only that era's nominal ratio shifted
+                     by +/- its own statistical uncertainty (uncorrelated across eras).
+    - MC syst      : luminosity-weighted average over the union of MC systematics across
+                     eras; eras missing a given variation fall back to their nominal ratio.
+
+    For P(DY) corrections the upward stat slice is clipped to <= 1.0 (a probability).
+    Returns ``(dict_for_hist_axis, reference_template)``.
+    """
+    from dctools import dict_to_hist_axis
+    ref_template = templates[0]
+    ref_sig = _axes_signature(ref_template)
+    for era, t in zip(eras[1:], templates[1:]):
+        assert _axes_signature(t) == ref_sig, (
+            f"Inconsistent binning for era {era} vs {eras[0]}; rebin configs to a common "
+            f"scheme before averaging across eras"
+        )
+    L = np.asarray(lumis, dtype=float)
+    wsum = L.sum()
+    n = len(per_era_ratios)
+    axis_keys = list(per_era_ratios[0].keys())
+    dict_for_hist_axis = {}
+    for axis_key in axis_keys:
+        nominal = [per_era_ratios[i][axis_key]["nominal"] for i in range(n)]
+        nom_ratios = [d["ratio"] for d in nominal]
+        unc_up = [d["unc_up"] for d in nominal]
+        unc_down = [d["unc_down"] for d in nominal]
+
+        comb_nominal = sum(L[i] * nom_ratios[i] for i in range(n)) / wsum
+        comb_stat = np.sqrt(sum((L[i] / wsum * unc_up[i]) ** 2 for i in range(n)))
+
+        dict_for_syst_axis = {}
+        # https://github.com/scikit-hep/boost-histogram/issues/421 - stack [value, variance] on the view
+        h_nom = ref_template.copy()
+        h_nom[...] = np.stack([comb_nominal, comb_stat], axis=-1)
+        dict_for_syst_axis["nominal"] = h_nom
+
+        # Per-era statistical uncertainty: recombine with only era i shifted (decorrelated across eras)
+        for i, era in enumerate(eras):
+            up_ratios = list(nom_ratios)
+            up_ratios[i] = nom_ratios[i] + unc_up[i]
+            down_ratios = list(nom_ratios)
+            down_ratios[i] = nom_ratios[i] - unc_down[i]
+            comb_up = sum(L[j] * up_ratios[j] for j in range(n)) / wsum
+            comb_down = sum(L[j] * down_ratios[j] for j in range(n)) / wsum
+            if is_probdy:
+                comb_up = np.clip(comb_up, a_min=None, a_max=1.0)
+            h_up = ref_template.copy()
+            h_up[...] = np.stack([comb_up, np.zeros_like(comb_up)], axis=-1)
+            h_down = ref_template.copy()
+            h_down[...] = np.stack([comb_down, np.zeros_like(comb_down)], axis=-1)
+            dict_for_syst_axis[f"stat_{era}Up"] = h_up
+            dict_for_syst_axis[f"stat_{era}Down"] = h_down
+
+        # MC systematics: union across eras, falling back to per-era nominal where disjoint
+        mc_systs = sorted(set().union(*[set(per_era_ratios[i][axis_key].keys()) for i in range(n)]) - {"nominal"})
+        for mc_syst in mc_systs:
+            syst_ratios = []
+            for i in range(n):
+                entry = per_era_ratios[i][axis_key].get(mc_syst)
+                syst_ratios.append(entry["ratio"] if entry is not None else nom_ratios[i])
+            comb = sum(L[i] * syst_ratios[i] for i in range(n)) / wsum
+            h_s = ref_template.copy()
+            h_s[...] = np.stack([comb, np.zeros_like(comb)], axis=-1)
+            dict_for_syst_axis[mc_syst] = h_s
+
+        dict_for_hist_axis[axis_key] = dict_to_hist_axis(
+            histos=dict_for_syst_axis,
+            axis_name="systematic",
+            axis_label="Systematic Variation",
+            axis_type="StrCategory",
+            axis_storage=hist.storage.Weight(),
+            axis_args={"growth": False},
+        )
+    return dict_for_hist_axis, ref_template
+
 
 if __name__ == "__main__":
     import argparse
@@ -126,8 +321,13 @@ if __name__ == "__main__":
     from dctools import datagroup, dict_to_hist_axis, update_axes_meta
 
     parser = argparse.ArgumentParser(description='SMQawa DataDriven Derivation')
-    parser.add_argument("-i", "--input", type=str, default="", help="Input YAML config file")
-    parser.add_argument("-y", "--era", type=str, default='2018', help="Era (2016/2017/2018)")
+    parser.add_argument("-i", "--input", type=str, nargs="+", default=[],
+                        help="Input YAML config file(s). Pass one config per era to average across eras.")
+    parser.add_argument("-y", "--era", type=str, default='2018',
+                        help="Fallback era label, used only for a single config that omits a top-level 'era' key.")
+    parser.add_argument("-o", "--output", type=str, default="",
+                        help="Output correctionlib JSON path for the (averaged) correction set. "
+                             "Defaults to data/dd/{era}/WZ_inclusive_data_driven_{era}.json for a single config.")
     parser.add_argument("--derive", action="store_true", help="Derive corrections from histograms")
     parser.add_argument("--skip_json", action="store_true", help="Skip writing correctionlib JSON")
     parser.add_argument("--probdy_method", type=str, default="pure_mc",
@@ -139,239 +339,146 @@ if __name__ == "__main__":
                         help="Number of top systematics to show in plots")
     options = parser.parse_args()
 
-    config = dctools.read_config(options.input) if options.input else None
+    config_paths = options.input if isinstance(options.input, list) else ([options.input] if options.input else [])
+    configs = [dctools.read_config(p) for p in config_paths]
 
     # Derive corrections
     derived_results = None
     if options.derive:
         from correctionlib import convert
         from correctionlib import schemav2 as cs
-        from hist.intervals import ratio_uncertainty
         new_corrections = []
         new_compoundcorrections = []
-        if config is None:
-            raise RuntimeError("--derive requires --input config file")
-        else:
-            print(f"=== Deriving data-driven corrections for era {options.era} ===")
-            datadriven_configs = config.datadriven
-            for ddconfig_key in config.datadriven:
-                import yaml
-                ddconfig = config.datadriven[ddconfig_key]
-                for ddcorrconfig_key in ddconfig["Corrections"]:
-                    ddcorrconfig = ddconfig["Corrections"][ddcorrconfig_key]
+        if not configs:
+            raise RuntimeError("--derive requires at least one --input config file")
+        # Resolve the era label for each config (used for the per-era stat_{era} nuisance names)
+        eras = []
+        for c in configs:
+            if "era" in c:
+                eras.append(str(c.era))
+            elif len(configs) == 1:
+                eras.append(str(options.era))
+            else:
+                raise RuntimeError("When averaging across multiple configs, each config must declare a top-level 'era' key")
+        lumis = [float(c.luminosity.value) for c in configs]
+        print(f"=== Deriving data-driven corrections averaged over eras {eras} (lumi weights {lumis}) ===")
+
+        base = configs[0]
+        for ddconfig_key in base.datadriven:
+            ddconfig = base.datadriven[ddconfig_key]
+            for ddcorrconfig_key in ddconfig["Corrections"]:
+                # Compute the per-bin ratios independently for each era / config
+                per_era_ratios, templates, is_probdy = [], [], False
+                for config in configs:
+                    ddcorrconfig = config.datadriven[ddconfig_key]["Corrections"][ddcorrconfig_key]
                     histogroups = {}
                     for channel, variable in ddcorrconfig.channels.items():
-                        histogroups[channel] = histogram_extractor(config,
-                                                                   variable,
-                                                                   channel,
-                                                                   rebin=config.rebin if "rebin" in config else 1,
-                                                                   xlim=[],
-                                                                   blind=False,
-                                                                   era="someyear",
-                                                                   checksyst=False,
-                                                                   remap_replacement_types = None,
-                                                                   )
-                    match ddcorrconfig.method:
-                        case "inc_WZ_DYDD_TransferFactor":
-                            data_hists = {}
-                            non_dy_mc_hists = {}
-                            dy_mc_hists = {}
-                            template_hists = {}
-                            mc_systematics = None
-                            for channel in histogroups:
-                                data_hists[channel] = histogroups[channel]["datasets"]["data"].to_boost()
-                                dy_mc_hists[channel] = histogroups[channel]["datasets"]["DY"].to_boost()
-                                non_dy_mc_hists[channel] = sum([v.to_boost() for k, v in histogroups[channel]["datasets"].items() if k not in ["data", "DY"]])
-                                template_hists[channel] = update_axes_meta(
-                                    data_hists[channel].project(*[ax.name for ax in data_hists[channel].axes if ax.name != "systematic"]).copy().reset(),
-                                    ddcorrconfig.update_axes_meta
-                                    )
-                                if mc_systematics is None:
-                                    mc_systematics = sorted([x for x in non_dy_mc_hists[channel].axes["systematic"]])
-                            channel_ratios = {}
-                            dict_for_hist_axis = {}
-                            for dict_to_hist_axis_key, num_den_dict in ddcorrconfig.channel_ratios.items():
-                                numerator_key, denominator_key = num_den_dict["numerator"], num_den_dict["denominator"]
-                                # key = f"{numerator_key}/{denominator_key}"
-                                dict_for_syst_axis = {}
-                                for mc_syst in mc_systematics:
-                                    # projections of fake rates by systematic
-                                    num, den, ratio, (ratio_unc_up, ratio_unc_down) = inc_WZ_dddy_tf_ratio_and_uncertainty(
-                                        data_hists,
-                                        non_dy_mc_hists,
-                                        data_syst="nominal",
-                                        non_dy_mc_syst=mc_syst,
-                                        numerator_key=numerator_key,
-                                        denominator_key=denominator_key,
-                                    )    
-                                    if mc_syst == "nominal":
-                                        # https://github.com/scikit-hep/boost-histogram/issues/421 - can also use h.view().value/variance, but MUST be on view, not h.value!!!
-                                        dict_for_syst_axis["nominal"] = template_hists[channel].copy()
-                                        dict_for_syst_axis["nominal"][...] = np.stack([ratio, ratio_unc_up], axis=-1)
-                                        dict_for_syst_axis["DDDYUp"] = template_hists[channel].copy()
-                                        dict_for_syst_axis["DDDYUp"][...] = np.stack([ratio + ratio_unc_up, np.zeros_like(ratio)], axis=-1)
-                                        dict_for_syst_axis["DDDYDown"] = template_hists[channel].copy()
-                                        dict_for_syst_axis["DDDYDown"][...] = np.stack([ratio - ratio_unc_down, np.zeros_like(ratio)], axis=-1)
-                                    else:
-                                        dict_for_syst_axis[mc_syst] = template_hists[channel].copy()
-                                        dict_for_syst_axis[mc_syst][...] = np.stack([ratio, np.zeros_like(ratio)], axis=-1)
-                                dict_for_hist_axis[dict_to_hist_axis_key] = dict_to_hist_axis(
-                                    # first promote the systematics axis for which we computed all slices
-                                    histos=dict_for_syst_axis,
-                                    axis_name="systematic",
-                                    axis_label="Systematic Variation",
-                                    axis_type="StrCategory",
-                                    axis_storage=hist.storage.Weight(),
-                                    axis_args={"growth": False},
-                                )
-                            dthac = ddcorrconfig.dict_to_hist_axis
-                            final_hist = dict_to_hist_axis(
-                                histos=dict_for_hist_axis,
-                                axis_name=dthac.axis_name,
-                                axis_label=dthac.axis_label,
-                                axis_type=dthac.axis_type,
-                                axis_storage=dthac.axis_storage,
-                                axis_iter_override=dthac.axis_iter_override if "axis_iter_override" in dthac else None,
-                                ).project(template_hists[channel].axes[0].name, dthac.axis_name, "systematic")
-                            # Set the correcitonset (name) and outputnode (label)
-                            final_hist.name = ddcorrconfig_key
-                            final_hist.label = ddcorrconfig.correctionset_output_label
-                            # Set the overflow behavior and the correctionset description (pairing with name above) as well as the output description
-                            corr = correctionlib.convert.from_histogram(final_hist)
-                            corr.data.flow = ddcorrconfig.correctionset_flow
-                            corr.description = ddcorrconfig.correctionset_top_description
-                            corr.output.description = ddcorrconfig.correctionset_output_description
-                            new_corrections.append(corr)
-                            print("TODO: Finish plotting")
-                        case "inc_WZ_DYDD_ProbDY":
-                            data_hists = {}
-                            non_dy_mc_hists = {}
-                            dy_mc_hists = {}
-                            template_hists = {}
-                            mc_systematics = None
-                            for channel in histogroups:
-                                data_hists[channel] = histogroups[channel]["datasets"]["data"].to_boost()
-                                dy_mc_hists[channel] = histogroups[channel]["datasets"]["DY"].to_boost()
-                                non_dy_mc_hists[channel] = sum([v.to_boost() for k, v in histogroups[channel]["datasets"].items() if k not in ["data", "DY"]])
-                                template_hists[channel] = update_axes_meta(
-                                    data_hists[channel].project(*[ax.name for ax in data_hists[channel].axes if ax.name != "systematic"]).copy().reset(),
-                                    ddcorrconfig.update_axes_meta
-                                    )
-                                if mc_systematics is None:
-                                    mc_systematics = sorted([x for x in non_dy_mc_hists[channel].axes["systematic"]])
-                            dict_for_hist_axis = {}
-                            for dict_to_hist_axis_key, channel in ddcorrconfig.channel_absolutes.items():
-                                dict_for_syst_axis = {}
-                                for mc_syst in mc_systematics:
-                                    # projections of fake rates by systematic
-                                    num, den, ratio, (ratio_unc_up, ratio_unc_down) = inc_WZ_dddy_probdy_ratio_and_uncertainty(
-                                        data_hists,
-                                        dy_mc_hists,
-                                        non_dy_mc_hists,
-                                        data_syst="nominal",
-                                        mc_syst=mc_syst,
-                                        channel=channel,
-                                        probdy_method = options.probdy_method,
-                                    )
-                                    if mc_syst == "nominal":
-                                        # https://github.com/scikit-hep/boost-histogram/issues/421 - can also use h.view().value/variance, but MUST be on view, not h.value!!!
-                                        dict_for_syst_axis["nominal"] = template_hists[channel].copy()
-                                        dict_for_syst_axis["nominal"][...] = np.stack([ratio, ratio_unc_up], axis=-1)
-                                        dict_for_syst_axis["DDDYUp"] = template_hists[channel].copy()
-                                        dict_for_syst_axis["DDDYUp"][...] = np.stack([np.clip(ratio + ratio_unc_up, a_min=None, a_max=1.0), np.zeros_like(ratio)], axis=-1)
-                                        dict_for_syst_axis["DDDYDown"] = template_hists[channel].copy()
-                                        dict_for_syst_axis["DDDYDown"][...] = np.stack([ratio - ratio_unc_down, np.zeros_like(ratio)], axis=-1)
-                                    else:
-                                        dict_for_syst_axis[mc_syst] = template_hists[channel].copy()
-                                        dict_for_syst_axis[mc_syst][...] = np.stack([ratio, np.zeros_like(ratio)], axis=-1)
-                                dict_for_hist_axis[dict_to_hist_axis_key] = dict_to_hist_axis(
-                                    # first promote the systematics axis for which we computed all slices
-                                    histos=dict_for_syst_axis,
-                                    axis_name="systematic",
-                                    axis_label="Systematic Variation",
-                                    axis_type="StrCategory",
-                                    axis_storage=hist.storage.Weight(),
-                                    axis_args={"growth": False},
-                                )
-                            dthac = ddcorrconfig.dict_to_hist_axis
-                            final_hist = dict_to_hist_axis(
-                                histos=dict_for_hist_axis,
-                                axis_name=dthac.axis_name,
-                                axis_label=dthac.axis_label,
-                                axis_type=dthac.axis_type,
-                                axis_storage=dthac.axis_storage,
-                                axis_iter_override=dthac.axis_iter_override if "axis_iter_override" in dthac else None,
-                                ).project(template_hists[channel].axes[0].name, dthac.axis_name, "systematic")
-                            # Set the correcitonset (name) and outputnode (label)
-                            final_hist.name = ddcorrconfig_key
-                            final_hist.label = ddcorrconfig.correctionset_output_label
-                            # Set the overflow behavior and the correctionset description (pairing with name above) as well as the output description
-                            corr = correctionlib.convert.from_histogram(final_hist)
-                            corr.data.flow = ddcorrconfig.correctionset_flow
-                            corr.description = ddcorrconfig.correctionset_top_description
-                            corr.output.description = ddcorrconfig.correctionset_output_description
-                            new_corrections.append(corr)
-                        case _:
-                            raise NotImplementedError(f"Unknown method for data driven correction configuration {ddconfig_key} {ddcorrconfig_key} {ddcorrconfig.method} [from config {ddcorrconfig}]")                    
-                for ddcompcorrconfig_key in ddconfig["CompoundCorrections"]:
-                    ddcompcorrconfig = ddconfig["CompoundCorrections"][ddcompcorrconfig_key]
-                    ddcompstack = ddcompcorrconfig.stack
-                    assert (isinstance(ddcompstack, list) and len(ddcompstack) > 0)
-                    # Use a dictionary
-                    ddcompinputs = {}
-                    for stk_key in ddcompstack:
-                        try:
-                            corrinputs = [x.inputs for x in new_corrections if x.name == stk_key][0]
-                        except IndexError as e:
-                            warnings.warn(f"Failed to find matching input for CompoundCorrection {ddcompcorrconfig_key}: {stk_key}"
-                                          f"Available corrections are: {[x.name for x in new_corrections]}"
-                                          )
-                            raise e
-                        for corrinp in corrinputs:
-                            ddcompinputs[corrinp.name] = corrinp
-                    comp = cs.CompoundCorrection(
-                        name=ddcompcorrconfig_key,
-                        description=ddcompcorrconfig.correctionset_top_description,
-                        inputs = ddcompinputs.values(),
-                        output=cs.Variable(name=ddcompcorrconfig.correctionset_output_label,
-                                           type=ddcompcorrconfig.correctionset_output_type,
-                                           description=ddcompcorrconfig.correctionset_output_description),                        
-                        inputs_update=ddcompcorrconfig.inputs_update,
-                        input_op=ddcompcorrconfig.input_op,
-                        output_op=ddcompcorrconfig.output_op,
-                        stack=ddcompstack,
-                    )
-                    new_compoundcorrections.append(comp)
-            new_cset = correctionlib.schemav2.CorrectionSet(
-                schema_version=2,
-                corrections=new_corrections,
-                compound_corrections=new_compoundcorrections,
-            )
-            outfile = Path(os.path.dirname(__file__)) / f"data/dd/{options.era}/WZ_inclusive_data_driven_{options.era}.json"
-            if not options.skip_json:
-                with open(outfile, "w") as fout:
-                    fout.write(new_cset.model_dump_json(exclude_unset=True))
-                print(f"Wrote to {outfile}"
-                      f"\n\tCorrections: {[x.name for x in new_corrections]}\n\tCompoundCorrections: {[x.name for x in new_compoundcorrections]}"
-                      )
-                rich.print(new_cset)
-            else:
-                print(f"Skipping write of new correctionset json: with {len(new_corrections)} Corrections and {len(new_compoundcorrections)} CompoundCorrections to {outfile}"
-                      f"\nWould have respectivelywritten \n\tCorrections: {[x.name for x in new_corrections]}\n\tCompoundCorrections: {[x.name for x in new_compoundcorrections]}"
-                      )
-            if options.plot:
-                raise NotImplementedError
+                        histogroups[channel] = histogram_extractor(
+                            config,
+                            variable,
+                            channel,
+                            rebin=config.rebin if "rebin" in config else 1,
+                            xlim=[],
+                            blind=False,
+                            era="someyear",
+                            checksyst=False,
+                            remap_replacement_types=None,
+                        )
+                    era_res = compute_era_correction(histogroups, ddcorrconfig, options.probdy_method)
+                    per_era_ratios.append(era_res["ratios"])
+                    templates.append(era_res["template"])
+                    is_probdy = era_res["is_probdy"]
+
+                # Average across eras: nominal is lumi-weighted, statistics become per-era
+                # stat_{era} nuisances, MC systematics are correlated (union, nominal fallback).
+                dict_for_hist_axis, template = combine_era_corrections(per_era_ratios, eras, lumis, templates, is_probdy)
+
+                dthac = base.datadriven[ddconfig_key]["Corrections"][ddcorrconfig_key].dict_to_hist_axis
+                final_hist = dict_to_hist_axis(
+                    histos=dict_for_hist_axis,
+                    axis_name=dthac.axis_name,
+                    axis_label=dthac.axis_label,
+                    axis_type=dthac.axis_type,
+                    axis_storage=dthac.axis_storage,
+                    axis_iter_override=dthac.axis_iter_override if "axis_iter_override" in dthac else None,
+                # Order inputs as (jet_multiplicity, tau_pt, systematic) to match how the
+                # consumer (DataDrivenEventReweight.estimate_dd_DY) calls evaluate(); from_histogram
+                # uses axis order for the declared input order.
+                ).project(dthac.axis_name, template.axes[0].name, "systematic")
+                # Set the correctionset (name) and output node (label)
+                ddcorrconfig = base.datadriven[ddconfig_key]["Corrections"][ddcorrconfig_key]
+                final_hist.name = ddcorrconfig_key
+                final_hist.label = ddcorrconfig.correctionset_output_label
+                # Set the overflow behavior and descriptions
+                corr = correctionlib.convert.from_histogram(final_hist)
+                corr.data.flow = ddcorrconfig.correctionset_flow
+                corr.description = ddcorrconfig.correctionset_top_description
+                corr.output.description = ddcorrconfig.correctionset_output_description
+                new_corrections.append(corr)
+
+            for ddcompcorrconfig_key in ddconfig["CompoundCorrections"]:
+                ddcompcorrconfig = ddconfig["CompoundCorrections"][ddcompcorrconfig_key]
+                ddcompstack = ddcompcorrconfig.stack
+                assert (isinstance(ddcompstack, list) and len(ddcompstack) > 0)
+                # Use a dictionary
+                ddcompinputs = {}
+                for stk_key in ddcompstack:
+                    try:
+                        corrinputs = [x.inputs for x in new_corrections if x.name == stk_key][0]
+                    except IndexError as e:
+                        warnings.warn(f"Failed to find matching input for CompoundCorrection {ddcompcorrconfig_key}: {stk_key}"
+                                      f"Available corrections are: {[x.name for x in new_corrections]}"
+                                      )
+                        raise e
+                    for corrinp in corrinputs:
+                        ddcompinputs[corrinp.name] = corrinp
+                comp = cs.CompoundCorrection(
+                    name=ddcompcorrconfig_key,
+                    description=ddcompcorrconfig.correctionset_top_description,
+                    inputs = ddcompinputs.values(),
+                    output=cs.Variable(name=ddcompcorrconfig.correctionset_output_label,
+                                       type=ddcompcorrconfig.correctionset_output_type,
+                                       description=ddcompcorrconfig.correctionset_output_description),
+                    inputs_update=ddcompcorrconfig.inputs_update,
+                    input_op=ddcompcorrconfig.input_op,
+                    output_op=ddcompcorrconfig.output_op,
+                    stack=ddcompstack,
+                )
+                new_compoundcorrections.append(comp)
+        new_cset = correctionlib.schemav2.CorrectionSet(
+            schema_version=2,
+            corrections=new_corrections,
+            compound_corrections=new_compoundcorrections,
+        )
+        if options.output:
+            outfile = Path(options.output)
+        else:
+            outfile = Path(os.path.dirname(__file__)) / f"data/dd/{eras[0]}/WZ_inclusive_data_driven_{eras[0]}.json"
+        if not options.skip_json:
+            outfile.parent.mkdir(parents=True, exist_ok=True)
+            with open(outfile, "w") as fout:
+                fout.write(new_cset.model_dump_json(exclude_unset=True))
+            print(f"Wrote to {outfile}"
+                  f"\n\tCorrections: {[x.name for x in new_corrections]}\n\tCompoundCorrections: {[x.name for x in new_compoundcorrections]}"
+                  )
+            rich.print(new_cset)
+        else:
+            print(f"Skipping write of new correctionset json: with {len(new_corrections)} Corrections and {len(new_compoundcorrections)} CompoundCorrections to {outfile}"
+                  f"\nWould have respectivelywritten \n\tCorrections: {[x.name for x in new_corrections]}\n\tCompoundCorrections: {[x.name for x in new_compoundcorrections]}"
+                  )
+        if options.plot:
+            raise NotImplementedError
 
     # Test
     print("\n=== Testing DataDrivenEventReweight ===")
+    test_path = options.output if options.output else None
     try:
-        test = DataDrivenEventReweight(era=options.era, estimator="LNTTau_VTTau_DDDY_Estimate")
+        test = DataDrivenEventReweight(era=options.era, estimator="LNTTau_VTTau_DDDY_Estimate", path=test_path)
         test_njets = np.array([0, 0, 0, 1, 1])
         test_tau_pt = np.array([25, 80, 55, 33, 110])
         print(f"njets: {test_njets}, tau_pt: {test_tau_pt}")
         print(f"weights (nominal): {test.estimate_dd_DY(test_njets, test_tau_pt)}")
-        print(f"weights (DDDYUp): {test.estimate_dd_DY(test_njets, test_tau_pt, systematic='DDDYUp')}")
-        test2 = DataDrivenEventReweight(era=options.era, estimator="LNTTau_VTTau_DDDY_Closure")
+        test2 = DataDrivenEventReweight(era=options.era, estimator="LNTTau_VTTau_DDDY_Closure", path=test_path)
         print(f"Closure weights (nominal): {test2.estimate_dd_DY(test_njets, test_tau_pt)}")
     except AssertionError as e:
         print(f"Skipping test: {e}")
