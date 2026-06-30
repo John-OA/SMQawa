@@ -3,9 +3,9 @@
 era: 2018
 
 boosthist:
-  # - ./data/merged-histogram-WZ-2018-Inc_WZ_lateset_alltau_jet_separation.pkl.gz
+  # - ./data/merged-histogram-WZ-2018-Inc_WZ_latest_alltau_jet_separation.pkl.gz
   # - ./data/merged-histogram-WZ-2018-Inc_WZ_l_and_b_jet_separation.pkl.gz
-  - ./merged-histogram-WZ-2018-Inc_WZ_lateset_dd.pkl.gz
+  - ./merged-histogram-WZ-2018-Inc_WZ_latest_dd.pkl.gz
   
     
 xsections:
