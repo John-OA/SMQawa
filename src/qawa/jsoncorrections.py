@@ -236,6 +236,19 @@ class CorrectionlibHandler:
             match self._era:
                 case "2024":
                     self._paths["trigger_sf"] = Path("src/qawa/data/trigger_sf/triggerSF_2024.json")
+                # Correctionlib conversions of the legacy ROOT trigger SFs
+                # (histo_triggerEff_sel0_<era>.root), produced by
+                # convert_trigger_sf.py. These collapse the eta dependence of the
+                # source histograms via per-bin inverse-variance combination, so
+                # they are NOT yet a drop-in replacement for the eta-dependent
+                # legacy lookup. Uncomment a case to route that era through the
+                # correctionlib path in wztau2lnu_inclusive._add_trigger_sf.
+                # case "2016":
+                #     self._paths["trigger_sf"] = Path("src/qawa/data/trigger_sf/triggerSF_2016.json")
+                # case "2017":
+                #     self._paths["trigger_sf"] = Path("src/qawa/data/trigger_sf/triggerSF_2017.json")
+                # case "2018":
+                #     self._paths["trigger_sf"] = Path("src/qawa/data/trigger_sf/triggerSF_2018.json")
                 case _:
                     pass
         elif analysis == "inc-ZZ":
