@@ -1,6 +1,8 @@
 import copy
 import correctionlib
+import json
 import os
+import re
 import awkward as ak
 from pathlib import Path
 import numpy as np
@@ -11,24 +13,79 @@ from typing import Dict, List, Tuple, Optional
 import warnings
 
 
+def discover_systematics(json_path):
+    """Scan a correctionlib JSON for the systematic variations carried by the correction.
+
+    Returns ``(stat_systematics, mc_systematics)``, each a sorted list of base names
+    (without the Up/Down suffix) for which BOTH an Up and a Down key exist:
+
+    - ``stat_systematics``: the per-era statistical nuisances, e.g. ["stat_2016", "stat_2018"].
+      These are unique to the data-driven estimate and decorrelated across eras.
+    - ``mc_systematics``: every other (paired) variation, e.g. ["JES", "pileup_weight", ...].
+      These are the underlying MC systematics propagated through the non-DY subtraction and
+      should be correlated with the same-named analysis nuisances, so they keep their bare names.
+
+    The legacy single statistical nuisance "DDDY" is excluded from ``mc_systematics``.
+    """
+    with open(json_path) as f:
+        data = json.load(f)
+    keys = set()
+
+    def _walk(node):
+        if isinstance(node, dict):
+            if node.get("nodetype") == "category":
+                for item in node.get("content", []):
+                    if isinstance(item, dict) and "key" in item:
+                        keys.add(item["key"])
+            for v in node.values():
+                _walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                _walk(v)
+
+    _walk(data)
+    pattern = re.compile(r"^(.+)(Up|Down)$")
+    ups, downs = set(), set()
+    for k in keys:
+        m = pattern.match(k)
+        if not m:
+            continue
+        (ups if m.group(2) == "Up" else downs).add(m.group(1))
+    paired = ups & downs
+    stat_systematics = sorted(b for b in paired if b.startswith("stat_"))
+    mc_systematics = sorted(b for b in paired if not b.startswith("stat_") and b != "DDDY")
+    return stat_systematics, mc_systematics
+
+
 class DataDrivenEventReweight:
-    """Reweight events using data-driven fake tau rate and P(DY) corrections."""
+    """Reweight events using the data-driven fake-tau / P(DY) correction set.
 
-    def __init__(self, era: str = "2018", estimator=None, path=None):
-        if path is None:
-            path = Path(os.path.dirname(__file__)) / f"data/dd/{era}/WZ_inclusive_data_driven_{era}.json"
-        _data_path = Path(path)
-        assert _data_path.exists(), f"DataDrivenEventReweight could not find the expected json file: {str(_data_path)}"
-        self.dd_estimator = correctionlib.CorrectionSet.from_file(str(_data_path))
-        if estimator is None:
-            raise KeyError(f"Must select valid CompoundCorrection from the available set: {[x for x in self.dd_estimator.compound.keys()]}")
+    Loads the requested compound correction (the DDDY estimate by default) and, when loaded
+    from a JSON file, exposes the per-era statistical nuisances (``stat_systematics``) and the
+    propagated MC systematics (``mc_systematics``) the consumer should fold into its weights.
+    """
+
+    def __init__(self, era: str = "2018", estimator: str = "LNTTau_VTTau_DDDY_Estimate", path=None, clibhandler=None):
+        if clibhandler is not None:
+            self.dd_estimator = clibhandler.getCorrectionSet("dddy").compound[estimator]
+            # Systematic discovery from a clibhandler is not supported; pass `path` if the
+            # per-era statistical / propagated MC variations are needed downstream.
+            self.stat_systematics = []
+            self.mc_systematics = []
         else:
-            self.dd_estimator = self.dd_estimator.compound[estimator]
+            if path is None:
+                path = Path(os.path.dirname(__file__)) / f"data/dd/{era}/WZ_inclusive_data_driven_{era}.json"
+            _data_path = Path(path)
+            assert _data_path.exists(), f"DataDrivenEventReweight could not find the expected json file: {str(_data_path)}"
+            cset = correctionlib.CorrectionSet.from_file(str(_data_path))
+            if estimator not in cset.compound:
+                raise KeyError(f"Must select a valid CompoundCorrection from the available set: {list(cset.compound.keys())}")
+            self.dd_estimator = cset.compound[estimator]
+            self.stat_systematics, self.mc_systematics = discover_systematics(_data_path)
 
-    def estimate_dd_DY(self, jet_multiplicity, tau_pt, systematic=None):
-        if systematic is not None:
-            return self.dd_estimator.evaluate(ak.fill_none(jet_multiplicity, 0), ak.fill_none(tau_pt, 0.0), systematic)
-        return self.dd_estimator.evaluate(ak.fill_none(jet_multiplicity, 0), ak.fill_none(tau_pt, 0.0), "nominal")
+    def estimate_dd_DY(self, jet_multiplicity, tau_pt, systematic: str = None):
+        systematic = "nominal" if systematic is None else systematic
+        return self.dd_estimator.evaluate(ak.fill_none(jet_multiplicity, 0.0), ak.fill_none(tau_pt, 0.0), systematic)
 
 def histogram_extractor(config,
                         variable,
@@ -371,13 +428,16 @@ if __name__ == "__main__":
                 per_era_ratios, templates, is_probdy = [], [], False
                 for config in configs:
                     ddcorrconfig = config.datadriven[ddconfig_key]["Corrections"][ddcorrconfig_key]
+                    # Per-correction fake-rate binning override (independent of the plotting
+                    # `rebin`), falling back to a global config.rebin then to 1 (no rebinning).
+                    ddrebin = ddcorrconfig.rebin if "rebin" in ddcorrconfig else (config.rebin if "rebin" in config else 1)
                     histogroups = {}
                     for channel, variable in ddcorrconfig.channels.items():
                         histogroups[channel] = histogram_extractor(
                             config,
                             variable,
                             channel,
-                            rebin=config.rebin if "rebin" in config else 1,
+                            rebin=ddrebin,
                             xlim=[],
                             blind=False,
                             era="someyear",

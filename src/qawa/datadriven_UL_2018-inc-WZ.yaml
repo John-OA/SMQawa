@@ -200,7 +200,7 @@ groups:
 
 plotting:
     inc-DY0:
-        tau_pt:
+        tau_pt_vtight:
             rebin: 2 
             range: [0, 300]
             blind: false
@@ -210,12 +210,12 @@ plotting:
             range: [0, 300]
             blind: false
     inc-SR0:
-        tau_pt:
+        tau_pt_vtight:
             rebin: 2 
             range: [0, 300]
             blind: true
     inc-SR1:
-        tau_pt:
+        tau_pt_vtight:
             rebin: 2 
             range: [0, 300]
             blind: true
@@ -240,12 +240,12 @@ plotting:
             range: [0, 300]
             blind: false
     inc-D0:
-        tau_pt:
+        tau_pt_vtight:
             rebin: 1 
             range: [0, 300]
             blind: false
     inc-D1:
-        tau_pt:
+        tau_pt_vtight:
             rebin: 1 
             range: [0, 300]
             blind: false
@@ -255,13 +255,19 @@ datadriven:
         Corrections:
             LNTTau_to_VTTau_TransferFactor:
                 method: inc_WZ_DYDD_TransferFactor
+                # fake-rate binning as merge-widths over the input tau_pt grid. With 5-GeV input
+                # bins (Regular(120, 0, 600), the current processor output) this gives edges
+                # [0,20,25,30,35,40,60,80,100,600], matching the legacy hard-coded fake-rate scheme:
+                rebin: [4, 1, 1, 1, 1, 4, 4, 4, 100]
+                # Legacy 10-GeV input bins (Regular(60, 0, 600)) -> [0,20,30,40,60,80,100,600]:
+                # rebin: [2, 1, 1, 2, 2, 2, 50]
                 correctionset_flow: clamp
                 correctionset_top_description: loose-not-tight tau to very-tight tau fake rate for Drell-Yan
                 correctionset_output_label: fake_rate
                 correctionset_output_description: fake rate for Drell-Yan
                 channels:
-                    inc-D0: tau_pt
-                    inc-D1: tau_pt
+                    inc-D0: tau_pt_vtight
+                    inc-D1: tau_pt_vtight
                     inc-C0: tau_pt_loose
                     inc-C1: tau_pt_loose
                 channel_ratios:
@@ -275,6 +281,8 @@ datadriven:
                     # rename tau_pt_loose axis name so that histograms can be added consistently
                     tau_pt_loose:
                         name: tau_pt
+                    tau_pt_vtight:
+                        name: tau_pt
                 dict_to_hist_axis:
                     axis_name: jet_multiplicity
                     axis_label: Number of jets
@@ -282,6 +290,12 @@ datadriven:
                     axis_storage: Weight
             LNTTau_HighMET_DY_to_Data_Estimate:
                 method: inc_WZ_DYDD_ProbDY
+                # fake-rate binning as merge-widths over the input tau_pt grid. With 5-GeV input
+                # bins (Regular(120, 0, 600), the current processor output) this gives edges
+                # [0,20,25,30,35,40,60,80,100,600], matching the legacy hard-coded fake-rate scheme:
+                rebin: [4, 1, 1, 1, 1, 4, 4, 4, 100]
+                # Legacy 10-GeV input bins (Regular(60, 0, 600)) -> [0,20,30,40,60,80,100,600]:
+                # rebin: [2, 1, 1, 2, 2, 2, 50]
                 correctionset_flow: clamp
                 correctionset_top_description: tau_pt parametrized probability event is from Drell-Yan
                 correctionset_output_label: prob_dy
@@ -296,6 +310,8 @@ datadriven:
                     # rename tau_pt_loose axis name so that histograms can be added consistently
                     tau_pt_loose:
                         name: tau_pt
+                    tau_pt_vtight:
+                        name: tau_pt
                 dict_to_hist_axis:
                     axis_name: jet_multiplicity
                     axis_label: Number of jets
@@ -303,6 +319,12 @@ datadriven:
                     axis_storage: Weight
             LNTTau_LowMET_DY_to_Data_Estimate:
                 method: inc_WZ_DYDD_ProbDY
+                # fake-rate binning as merge-widths over the input tau_pt grid. With 5-GeV input
+                # bins (Regular(120, 0, 600), the current processor output) this gives edges
+                # [0,20,25,30,35,40,60,80,100,600], matching the legacy hard-coded fake-rate scheme:
+                rebin: [4, 1, 1, 1, 1, 4, 4, 4, 100]
+                # Legacy 10-GeV input bins (Regular(60, 0, 600)) -> [0,20,30,40,60,80,100,600]:
+                # rebin: [2, 1, 1, 2, 2, 2, 50]
                 correctionset_flow: clamp
                 correctionset_top_description: tau_pt parametrized probability event is from Drell-Yan
                 correctionset_output_label: prob_dy
@@ -316,6 +338,8 @@ datadriven:
                 update_axes_meta:
                     # rename tau_pt_loose axis name so that histograms can be added consistently
                     tau_pt_loose:
+                        name: tau_pt
+                    tau_pt_vtight:
                         name: tau_pt
                 dict_to_hist_axis:
                     axis_name: jet_multiplicity

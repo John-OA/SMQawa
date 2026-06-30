@@ -32,7 +32,7 @@ from qawa.tauSF import tauIDScaleFactors, tau_energy_scale
 from qawa.btag import BTVCorrector
 from qawa.jme import JMEUncertainty, update_collection
 from qawa.gen_match import find_best_match
-from qawa.datadriven_variation import DataDrivenEventReweight
+from qawa.datadriven import DataDrivenEventReweight
 from qawa.common import pileup_weights, ewk_corrector, met_phi_xy_correction, theory_ps_weight, theory_pdf_weight, trigger_rules, transverse_energy, propagate_shift_to_met
 from qawa.jsoncorrections import CorrectionlibHandler
 from qawa.met_shim import prepare_met_for_factory
@@ -399,8 +399,12 @@ class wzinclusive_processor(processor.ProcessorABC):
             # FIXME: Do we need to adjust inputs or derive new corrections for Run III? For now we'll put in the beam_energy
             self.ewk_corr = ewk_corrector(process=ewk_process_name, beam_energy=self.beam_energy)
 
+        # Target (coarse) tau fake-rate binning of the hard-coded/derived correction set. The
+        # tau_pt / tau_pt_loose histograms below are now filled at fine 5-GeV granularity
+        # (Regular(120, 0, 600)) so the data-driven derivation can rebin down to exactly this
+        # scheme via `hist.rebin(groups=[4, 1, 1, 1, 1, 4, 4, 4, 100])` (see datadriven configs).
         self.ABCD_tau_bins = [20,25,30,35,40,60,80,100,1000]
-        #to change this in tau_pt use this in tau histogram hist.axis.Variable(self.ABCD_tau_bins, name="tau_pt", label=r"$p_{T}^{tau}$ (GeV)")
+        #to change this in tau_pt_vtight use this in tau histogram hist.axis.Variable(self.ABCD_tau_bins, name="tau_pt_vtight", label=r"$p_{T}^{tau_vtight}$ (GeV)")
 
         self.build_histos = lambda: {
             'dilep_mt_llnunu': hist.Hist(
@@ -481,11 +485,12 @@ class wzinclusive_processor(processor.ProcessorABC):
                 hist.axis.Regular(150, 0, 1500, name="inv_m_WZ", label=r"$m_{inv}^{WZ}$ (GeV)"),
                 hist.storage.Weight()
             ),
-            'tau_pt': hist.Hist(
+            'tau_pt_vtight': hist.Hist(
                 hist.axis.StrCategory([], name="channel"   , growth=True),
                 hist.axis.StrCategory([], name="systematic", growth=True),
-                # hist.axis.Regular(60, 0, 600, name="tau_pt", label=r"$p_{T}^{tau}$ (GeV)"), 
-                hist.axis.Variable(self.ABCD_tau_bins, name="tau_pt", label=r"$p_{T}^{tau}$ (GeV)"),
+                # 5-GeV bins (rebinnable to self.ABCD_tau_bins in the data-driven derivation):
+                # hist.axis.Variable(self.ABCD_tau_bins, name="tau_pt_vtight", label=r"$p_{T}^{tau_vtight}$ (GeV)"),
+                hist.axis.Regular(120, 0, 600, name="tau_pt_vtight", label=r"$p_{T}^{tau_vtight}$ (GeV)"),
                 hist.storage.Weight()
             ),
             'taus_eta': hist.Hist(
@@ -503,8 +508,16 @@ class wzinclusive_processor(processor.ProcessorABC):
             'tau_pt_loose': hist.Hist(
                 hist.axis.StrCategory([], name="channel"   , growth=True),
                 hist.axis.StrCategory([], name="systematic", growth=True),
-                # hist.axis.Regular(60, 0, 600, name="tau_pt_loose", label=r"$p_{T}^{tau_loose}$ (GeV)"), 
-                hist.axis.Variable(self.ABCD_tau_bins, name="tau_pt_loose", label=r"$p_{T}^{tau_loose}$ (GeV)"),
+                # 5-GeV bins (rebinnable to self.ABCD_tau_bins in the data-driven derivation):
+                # hist.axis.Variable(self.ABCD_tau_bins, name="tau_pt_loose", label=r"$p_{T}^{tau_loose}$ (GeV)"),
+                hist.axis.Regular(120, 0, 600, name="tau_pt_loose", label=r"$p_{T}^{tau_loose}$ (GeV)"),
+                hist.storage.Weight()
+            ),
+            'tau_pt_tight': hist.Hist(
+                hist.axis.StrCategory([], name="channel"   , growth=True),
+                hist.axis.StrCategory([], name="systematic", growth=True),
+                # 5-GeV bins (rebinnable to self.ABCD_tau_bins in the data-driven derivation):
+                hist.axis.Regular(120, 0, 600, name="tau_pt_tight", label=r"$p_{T}^{tau_tight}$ (GeV)"),
                 hist.storage.Weight()
             ),
             'taus_eta_loose': hist.Hist(
@@ -945,7 +958,8 @@ class wzinclusive_processor(processor.ProcessorABC):
         lead_tau_tight = ak.firsts(had_taus_tight)
         lead_tau_loose = ak.firsts(had_taus_loose)
 
-        tau_pt = lead_tau_vtight.pt
+        tau_pt_vtight = lead_tau_vtight.pt
+        tau_pt_tight = lead_tau_tight.pt
         taus_eta = lead_tau_vtight.eta
         taus_phi = lead_tau_vtight.phi
         tau_E = lead_tau_vtight.E
@@ -1200,7 +1214,8 @@ class wzinclusive_processor(processor.ProcessorABC):
         event['dijet_mass'] = ak.fill_none(dijet_mass,-99)
         event['dijet_deta'] = ak.fill_none(dijet_deta,-99)
         event['min_dphi_met_j'] = ak.fill_none(min_dphi_met_j,-99)
-        event['tau_pt'] = ak.fill_none(tau_pt,-99)
+        event['tau_pt_vtight'] = ak.fill_none(tau_pt_vtight,-99)
+        event['tau_pt_tight'] = ak.fill_none(tau_pt_tight,-99)
         event['taus_phi'] = ak.fill_none(taus_phi,-99)
         event['taus_eta'] = ak.fill_none(taus_eta,-99)
         event['delta_R'] = ak.fill_none(delta_R,-99)
@@ -1509,7 +1524,8 @@ class wzinclusive_processor(processor.ProcessorABC):
                 _histogram_filler(ch, sys, 'trailing_lep_eta')
                 _histogram_filler(ch, sys, 'met_pt')
                 _histogram_filler(ch, sys, 'met_phi')
-                _histogram_filler(ch, sys, 'tau_pt')
+                _histogram_filler(ch, sys, 'tau_pt_vtight')
+                _histogram_filler(ch, sys, 'tau_pt_tight')
                 _histogram_filler(ch, sys, 'taus_phi')
                 _histogram_filler(ch, sys, 'taus_eta')
                 _histogram_filler(ch, sys, 'tau_pt_loose')
