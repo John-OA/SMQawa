@@ -366,26 +366,32 @@ class CorrectionlibHandler:
     def _relForDisplay(self, path):
         """Anchor a path against a known root so common prefixes collapse away.
 
-        Returns ``(anchor, relative_parts)``. ``anchor`` is 'cvmfs' for POG
-        metadata, 'qawa' for files shipped in the package data dir, or 'abs'
-        for anything else (shown in full).
+        Returns the path's components relative to the best-matching root: the
+        CAT POG tree on /cvmfs (components start at the POG), the packaged qawa
+        data dir (prefixed with a ``~`` marker), or the filesystem root for
+        anything else. The leading absolute separator is folded into the first
+        component so tree joins never produce a doubled slash.
         """
         p = Path(path)
         if self._poghead in p.parents:
-            return ("cvmfs", p.relative_to(self._poghead).parts)
+            return p.relative_to(self._poghead).parts
         if _QAWA_DATA in p.parents:
-            return ("qawa", p.relative_to(_QAWA_DATA).parts)
-        return ("abs", p.parts)
+            return ("~",) + p.relative_to(_QAWA_DATA).parts
+        parts = p.parts
+        if len(parts) > 1 and parts[0] == os.sep:
+            parts = (parts[0] + parts[1],) + parts[2:]
+        return parts
 
     def printStatus(self, console=None, title: str | None = None, print_it: bool = True):
         """Render a rich table summarising every tracked correction path.
 
-        Columns: shorthand name (the key for ``getCorrectionSet``), the path
-        rendered as an indented tree with shared prefixes collapsed, whether the
-        file exists on disk, whether a CorrectionSet has been loaded, and how
-        many newer date-tagged versions exist on /cvmfs (green = up to date,
-        shading toward red for 5+ versions behind; magenta = a non-date tag is
-        pinned and cannot be version-checked).
+        Columns: the path (first) rendered as a tree — directory prefixes shared
+        by more than one entry are lifted onto their own line and the members
+        indented beneath — then the shorthand name (the key for
+        ``getCorrectionSet``), whether the file exists on disk, whether a
+        CorrectionSet has been loaded, and how many newer date-tagged versions
+        exist on /cvmfs (green = up to date, shading toward red for 5+ versions
+        behind; magenta = a non-date tag is pinned and cannot be version-checked).
 
         Pass ``console`` to reuse an existing rich console (e.g. coffea's), or
         leave it ``None`` to auto-discover the coffea console if it is imported.
@@ -398,12 +404,91 @@ class CorrectionlibHandler:
         for k, v in self._notcsets.items():
             entries.setdefault(k, v)
 
-        # Sort by anchor then path so files sharing a POG hierarchy sit together
-        # and the tree indentation is meaningful.
-        items = sorted(
-            entries.items(),
-            key=lambda kv: (self._relForDisplay(kv[1])[0], self._relForDisplay(kv[1])[1]),
-        )
+        # Precompute every cell up front, keyed by the display path components.
+        display = []
+        for key, path in entries.items():
+            p = Path(path)
+            exists_cell = "[green]✔[/green]" if p.exists() else "[red]✘[/red]"
+            if key in self._csets:
+                loaded_cell = "[green]✔[/green]"
+            elif key in self._notcsets:
+                loaded_cell = "[yellow]not a cset[/yellow]"
+            else:
+                loaded_cell = "[dim]–[/dim]"
+            count, kind = self._countNewerTags(p)
+            if kind == "na":
+                newer_cell = "[dim]–[/dim]"
+            elif kind == "nondate":
+                newer_cell = f"[magenta]{count}⚠[/magenta]"
+            else:
+                color = self._newerTagColor(count)
+                suffix = " (current)" if count == 0 else ""
+                newer_cell = f"[{color}]{count}{suffix}[/{color}]"
+            display.append({
+                "key": key,
+                "parts": self._relForDisplay(p),
+                "exists": exists_cell,
+                "loaded": loaded_cell,
+                "newer": newer_cell,
+            })
+        display.sort(key=lambda e: e["parts"])
+
+        # Build a trie over the path components so shared directory prefixes can
+        # be factored out. Each node holds sub-directories and terminal files.
+        def _new_node():
+            return {"dirs": {}, "files": []}
+
+        root = _new_node()
+        for e in display:
+            node = root
+            for seg in e["parts"][:-1]:
+                node = node["dirs"].setdefault(seg, _new_node())
+            node["files"].append((e["parts"][-1], e))
+
+        def _count_leaves(node):
+            return len(node["files"]) + sum(_count_leaves(c) for c in node["dirs"].values())
+
+        def _single_leaf(node):
+            # Called only on subtrees holding exactly one file; return its
+            # remaining path (relative to node) and the entry.
+            if node["files"]:
+                return node["files"][0]
+            seg = next(iter(node["dirs"]))
+            tail, e = _single_leaf(node["dirs"][seg])
+            return f"{seg}/{tail}", e
+
+        def _fmt_leaf(indent, s):
+            # Dim the directory portion, leave the filename at full contrast.
+            if "/" in s:
+                d, f = s.rsplit("/", 1)
+                return f"{indent}[dim]{escape(d)}/[/dim]{escape(f)}"
+            return f"{indent}{escape(s)}"
+
+        rows = []  # (path_cell, entry_or_None); None marks a shared-prefix header
+
+        def _walk(node, depth):
+            indent = "  " * depth
+            for seg in sorted(node["dirs"]):
+                child = node["dirs"][seg]
+                # Collapse a chain of single-child directories into one segment.
+                segs = [seg]
+                while len(child["dirs"]) == 1 and not child["files"]:
+                    only = next(iter(child["dirs"]))
+                    segs.append(only)
+                    child = child["dirs"][only]
+                compressed = "/".join(segs)
+                if _count_leaves(child) > 1:
+                    # Shared by more than one entry: give it its own line.
+                    rows.append((f"{indent}[bold dim]{escape(compressed)}/[/bold dim]", None))
+                    _walk(child, depth + 1)
+                else:
+                    # Only one file below: keep it inline, no header line.
+                    tail, e = _single_leaf(child)
+                    rows.append((_fmt_leaf(indent, f"{compressed}/{tail}"), e))
+            for fname, e in sorted(node["files"], key=lambda t: t[0]):
+                rows.append((_fmt_leaf(indent, fname), e))
+
+        _walk(root, 0)
 
         table = Table(
             title=title or f"CorrectionlibHandler status  [dim]({self._run} {self._era}"
@@ -414,66 +499,24 @@ class CorrectionlibHandler:
             header_style="bold",
             caption=(
                 f"[dim]cvmfs POG root:[/dim] {self._poghead}\n"
-                f"[dim]qawa data root:[/dim] {_QAWA_DATA}\n"
+                f"[dim]qawa data root (~):[/dim] {_QAWA_DATA}\n"
                 "[dim]newer tags: [/dim][rgb(0,180,0)]0 (current)[/] .. "
                 "[rgb(200,0,0)]>=5 behind[/]   "
                 "[magenta]magenta = non-date tag pinned[/magenta]"
             ),
             caption_justify="left",
         )
-        table.add_column("name", style="bold cyan", no_wrap=True)
         table.add_column("path", overflow="fold")
+        table.add_column("name", style="bold cyan", no_wrap=True)
         table.add_column("exists", justify="center")
         table.add_column("loaded", justify="center")
         table.add_column("newer tags", justify="right")
 
-        prev_anchor = None
-        prev_parts = ()
-        for key, path in items:
-            p = Path(path)
-            anchor, parts = self._relForDisplay(p)
-
-            # Tree-style compression: hide the leading components this row shares
-            # with the previous one (within the same anchor group), indenting to
-            # show the nesting instead.
-            if anchor != prev_anchor:
-                prev_parts = ()
-            shared = 0
-            while (
-                shared < len(parts) - 1
-                and shared < len(prev_parts)
-                and parts[shared] == prev_parts[shared]
-            ):
-                shared += 1
-            indent = "  " * shared
-            tail_dirs = parts[shared:-1]
-            fname = parts[-1]
-            marker = {"qawa": "[green]~[/green]/", "abs": ""}.get(anchor, "")
-            dir_str = ("/".join(tail_dirs) + "/") if tail_dirs else ""
-            path_cell = f"{indent}{marker if shared == 0 else ''}[dim]{dir_str}[/dim]{fname}"
-            prev_anchor, prev_parts = anchor, parts
-
-            exists = p.exists()
-            exists_cell = "[green]✔[/green]" if exists else "[red]✘[/red]"
-
-            if key in self._csets:
-                loaded_cell = "[green]✔[/green]"
-            elif key in self._notcsets:
-                loaded_cell = "[yellow]not a cset[/yellow]"
+        for path_cell, e in rows:
+            if e is None:
+                table.add_row(path_cell, "", "", "", "")
             else:
-                loaded_cell = "[dim]–[/dim]"
-
-            count, kind = self._countNewerTags(p)
-            if kind == "na":
-                newer_cell = "[dim]–[/dim]"
-            elif kind == "nondate":
-                newer_cell = f"[magenta]{count}⚠[/magenta]"
-            else:
-                color = self._newerTagColor(count)
-                suffix = " (current)" if count == 0 else ""
-                newer_cell = f"[{color}]{count}{suffix}[/{color}]"
-
-            table.add_row(key, path_cell, exists_cell, loaded_cell, newer_cell)
+                table.add_row(path_cell, e["key"], e["exists"], e["loaded"], e["newer"])
 
         if print_it:
             console.print(table)
