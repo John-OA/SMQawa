@@ -4,6 +4,12 @@ import rich
 
 import correctionlib
 
+# Directory of the installed `qawa` package (.../src/qawa). Anchoring on
+# __file__ makes data lookups independent of the current working directory,
+# so they resolve inside Singularity/HTCondor where CWD is not the repo root.
+_QAWA_DIR = Path(__file__).resolve().parent
+_QAWA_DATA = _QAWA_DIR / "data"
+
 _runIII_v15_pogs_tags_pogtags_csets = (
     ("DC", "Collisions22", "2026-02-26", "Cert_Collisions2022_355100_362760_Golden.json"),
     ("DC", "Collisions23", "2026-02-26", "Cert_Collisions2023_366442_370790_Golden.json"),
@@ -235,7 +241,9 @@ class CorrectionlibHandler:
         if analysis == "inc-WZ":
             match self._era:
                 case "2024":
-                    self._paths["trigger_sf"] = Path("src/qawa/data/trigger_sf/triggerSF_2024.json")
+                    # PLACEHOLDER - once Run 3 dddy (2024 only to start with) is derived, replace with Run3/...Run3.json
+                    self._paths["dddy"] = _QAWA_DATA / "dd" / "Run2" / "WZ_inclusive_data_driven_Run2.json"
+                    self._paths["trigger_sf"] = _QAWA_DATA / "trigger_sf" / "triggerSF_2024.json"
                 # Correctionlib conversions of the legacy ROOT trigger SFs
                 # (histo_triggerEff_sel0_<era>.root), produced by
                 # convert_trigger_sf.py. These collapse the eta dependence of the
@@ -243,11 +251,14 @@ class CorrectionlibHandler:
                 # they are NOT yet a drop-in replacement for the eta-dependent
                 # legacy lookup. Uncomment a case to route that era through the
                 # correctionlib path in wztau2lnu_inclusive._add_trigger_sf.
-                # case "2016":
+                case "2016":
+                    self._paths["dddy"] = _QAWA_DATA / "dd" / "Run2" / "WZ_inclusive_data_driven_Run2.json"
                 #     self._paths["trigger_sf"] = Path("src/qawa/data/trigger_sf/triggerSF_2016.json")
-                # case "2017":
+                case "2017":
+                    self._paths["dddy"] = _QAWA_DATA / "dd" / "Run2" / "WZ_inclusive_data_driven_Run2.json"
                 #     self._paths["trigger_sf"] = Path("src/qawa/data/trigger_sf/triggerSF_2017.json")
-                # case "2018":
+                case "2018":
+                    self._paths["dddy"] = _QAWA_DATA / "dd" / "Run2" / "WZ_inclusive_data_driven_Run2.json"
                 #     self._paths["trigger_sf"] = Path("src/qawa/data/trigger_sf/triggerSF_2018.json")
                 case _:
                     pass
