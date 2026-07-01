@@ -245,12 +245,11 @@ def apply_hem_uncertainty(jets, met):
 
 
 class wzinclusive_processor(processor.ProcessorABC):
-    # TODOS:  modify purw and JMEUncertainty appropriately, also the tauID, then maybe add the dd loading to the clibhandler for consistency... update coffea/correctionlib versions and utilize the new clib JECs... also consider the JER, deterministic smearing,  need to add in the tau ID 2018 algo for Run 3, and choose the right btagger for selection inside the select jets functions...
+    # TODOS:  modify purw and JMEUncertainty appropriately, also the tauID, update coffea/correctionlib versions and utilize the new clib JECs... also consider the JER, deterministic smearing
     # NEED
     #    JER Smearing broken in txt format, need to update to clib, unclear if coffea version fully ready with L1 and new MET stuff
     #    Verify electroweak corrections are working as intended
     #    Update inc-ZZ to utilize the same interfaces
-    # IMMEDIATE ACTION LIST: b-tag on-demand file loading or workaround, MET workaround...
     # NICE TO HAVE / DEFER
     #    Switch to correctionlib JECS + Type1 MET when coffea implementation for MET and JME implementation of "L1" only correction can be loaded/built
     def __init__(self, era: str ='2018', ewk_process_name=None, run_period: str = '', split_by_charge:bool = False, version="v9"):
@@ -342,6 +341,7 @@ class wzinclusive_processor(processor.ProcessorABC):
         self.zmass = 91.1873 # GeV
         self.clibhandler = CorrectionlibHandler(era = self._era, subera=None, isAPV=self._isAPV, isEE=self._isEE, isBPix=self._isBPix,
                                                 analysis="inc-WZ", nanoAODversion=self._ver, cvmfs_head="/cvmfs/")
+        self.clibhandler.printStatus(console=coffea_console)
         self._btag = BTVCorrector(era=self._era, wp=self.btag_wp, tagger=self.btag_tagger, isAPV=self._isAPV, isEE=self._isEE, isBPix=self._isBPix, clibhandler=self.clibhandler)
         # FIXME: Need JER updates according to https://cms-talk.web.cern.ch/t/new-jer-smearing-inputs-available-for-2024-and-2025/145723/1
         # FIXME: JMEUncertainty class not ready for Correctionlib yet... need upstream updates
