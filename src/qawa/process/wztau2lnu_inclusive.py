@@ -360,7 +360,7 @@ class wzinclusive_processor(processor.ProcessorABC):
             self._jpSF = None
         self._tauID= tauIDScaleFactors(era=self._era, vsjet_wp=self.tauIDvsjet_wp, vse_wp=self.tauIDvse_wp_for_sfs, vsmu_wp=self.tauIDvsmu_wp,
                                        isAPV=self._isAPV, isEE=self._isEE, isBPix=self._isBPix, clibhandler=self.clibhandler)
-        self._dd   = DataDrivenEventReweight(era=self._era, clibhandler=self.clibhandler)
+        self._dd   = DataDrivenEventReweight(era=self._era, isAPV=self._isAPV, isEE=self._isEE, isBPix=self._isBPix, clibhandler=self.clibhandler)
 
         _data_path = 'qawa/data'
         _data_path = os.path.join(os.path.dirname(__file__), '../data')
@@ -1311,11 +1311,13 @@ class wzinclusive_processor(processor.ProcessorABC):
             # If systematic variations are needed, they must be manually inserted here to give different DD estimates; they should be picked up later for histos.
             weights.add("datadriven_DDDYNominal", _ones, self._dd.estimate_dd_DY(ngood_jets, tau_pt_loose, systematic="nominal"), self._dd.estimate_dd_DY(ngood_jets, tau_pt_loose, systematic="nominal"))  #added nominal value twice to avoid getting 1/up for the nominaldown
             if self._dd.stat_systematics:
-                # Averaged (multi-era) estimate: one decorrelated statistical nuisance per era (stat_{era})
+                # Per-era statistical nuisance(s): DataDrivenEventReweight restricts stat_systematics
+                # to the single stat_{era} matching the era/subera being processed, so the other
+                # eras' stat nuisances stay at nominal for these events (keeping them decorrelated).
                 for _stat in self._dd.stat_systematics:
                     weights.add(f"datadriven_{_stat}", _ones, self._dd.estimate_dd_DY(ngood_jets, tau_pt_loose, f"{_stat}Up"), self._dd.estimate_dd_DY(ngood_jets, tau_pt_loose, f"{_stat}Down"))
-            else:
-                # Legacy single-era estimate: a single combined statistical nuisance
+            elif self._dd.has_legacy_dddy:
+                # Legacy estimate: a single combined statistical nuisance
                 weights.add("datadriven_DDDY",_ones, self._dd.estimate_dd_DY(ngood_jets, tau_pt_loose, "DDDYUp"), self._dd.estimate_dd_DY(ngood_jets, tau_pt_loose, "DDDYDown"))
             # Propagated MC systematics from the non-DY subtraction, added under their bare source
             # names so they correlate with the same-named analysis nuisances on the MC.
