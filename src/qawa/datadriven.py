@@ -16,16 +16,17 @@ from typing import Dict, List, Tuple, Optional
 def discover_systematics(json_path):
     """Scan a correctionlib JSON for the systematic variations carried by the correction.
 
-    Returns ``(stat_systematics, mc_systematics)``, each a sorted list of base names
-    (without the Up/Down suffix) for which BOTH an Up and a Down key exist:
+    Returns ``(stat_systematics, mc_systematics, has_legacy_dddy)``:
 
-    - ``stat_systematics``: the per-era statistical nuisances, e.g. ["stat_2016", "stat_2018"].
-      These are unique to the data-driven estimate and decorrelated across eras.
-    - ``mc_systematics``: every other (paired) variation, e.g. ["JES", "pileup_weight", ...].
+    - ``stat_systematics``: sorted per-era statistical nuisance base names (paired Up/Down),
+      e.g. ["stat_2016", "stat_2018"]. These are unique to the data-driven estimate and
+      decorrelated across eras. A single-era estimate still carries its own (single) entry,
+      e.g. ["stat_2024"].
+    - ``mc_systematics``: every other paired variation, e.g. ["JES", "pileup_weight", ...].
       These are the underlying MC systematics propagated through the non-DY subtraction and
       should be correlated with the same-named analysis nuisances, so they keep their bare names.
-
-    The legacy single statistical nuisance "DDDY" is excluded from ``mc_systematics``.
+    - ``has_legacy_dddy``: whether the legacy single combined statistical nuisance "DDDY"
+      (paired DDDYUp/DDDYDown) is present. It is excluded from ``mc_systematics``.
     """
     with open(json_path) as f:
         data = json.load(f)
@@ -54,7 +55,8 @@ def discover_systematics(json_path):
     paired = ups & downs
     stat_systematics = sorted(b for b in paired if b.startswith("stat_"))
     mc_systematics = sorted(b for b in paired if not b.startswith("stat_") and b != "DDDY")
-    return stat_systematics, mc_systematics
+    has_legacy_dddy = "DDDY" in paired
+    return stat_systematics, mc_systematics, has_legacy_dddy
 
 
 class DataDrivenEventReweight:
@@ -65,13 +67,32 @@ class DataDrivenEventReweight:
     propagated MC systematics (``mc_systematics``) the consumer should fold into its weights.
     """
 
-    def __init__(self, era: str = "2018", estimator: str = "LNTTau_VTTau_DDDY_Estimate", path=None, clibhandler=None):
+    def __init__(self, era: str = "2018", estimator: str = "LNTTau_VTTau_DDDY_Estimate", path=None, clibhandler=None,
+                 isAPV: bool = False, isEE: bool = False, isBPix: bool = False):
+        # Era/subera label (same "era + _subera" convention used elsewhere, e.g. leptonsSF) used to
+        # match the per-era statistical nuisance (stat_{erasubera}) of the (possibly multi-era
+        # averaged) estimate. The stat keys carry no underscore (stat_2016APV), so it is stripped
+        # when matching; see combine_era_corrections for how these are derived.
+        self.erasubera = era
+        if isAPV:
+            self.erasubera += "_APV"
+        elif isEE:
+            self.erasubera += "_EE"
+        elif isBPix:
+            self.erasubera += "_BPix"
+
         if clibhandler is not None:
             self.dd_estimator = clibhandler.getCorrectionSet("dddy").compound[estimator]
-            # Systematic discovery from a clibhandler is not supported; pass `path` if the
-            # per-era statistical / propagated MC variations are needed downstream.
-            self.stat_systematics = []
-            self.mc_systematics = []
+            # Systematic discovery needs the raw JSON category keys, which the cached correctionlib
+            # CorrectionSet does not expose; getPath + bare json.load (in discover_systematics) does
+            # not re-open the file through correctionlib, so it does not defeat the handler's cache.
+            _data_path = clibhandler.getPath("dddy", fallbackNone=True)
+            if _data_path is not None and Path(_data_path).exists():
+                self.stat_systematics, self.mc_systematics, self.has_legacy_dddy = discover_systematics(_data_path)
+            else:
+                self.stat_systematics = []
+                self.mc_systematics = []
+                self.has_legacy_dddy = False
         else:
             if path is None:
                 path = Path(os.path.dirname(__file__)) / f"data/dd/{era}/WZ_inclusive_data_driven_{era}.json"
@@ -81,7 +102,24 @@ class DataDrivenEventReweight:
             if estimator not in cset.compound:
                 raise KeyError(f"Must select a valid CompoundCorrection from the available set: {list(cset.compound.keys())}")
             self.dd_estimator = cset.compound[estimator]
-            self.stat_systematics, self.mc_systematics = discover_systematics(_data_path)
+            self.stat_systematics, self.mc_systematics, self.has_legacy_dddy = discover_systematics(_data_path)
+
+        # Every estimate carries a statistical component. A modern estimate exposes it as one
+        # decorrelated nuisance per era it was built from (stat_2016, stat_2016APV, ..., or just
+        # stat_2024 for a single-era build); a legacy estimate exposes one combined "DDDY". Only
+        # the per-era stat matching the era/subera being processed applies to these events (the
+        # others stay at nominal, keeping the per-era stat nuisances decorrelated in the fit).
+        self.all_stat_systematics = list(self.stat_systematics)
+        self.stat_systematics = [s for s in self.all_stat_systematics if s == f"stat_{self.erasubera.replace('_', '')}"]
+        # Sanity check: the file must carry the statistical component for the era being processed,
+        # either as its matching per-era stat nuisance or (legacy) as the combined DDDY. Otherwise
+        # the wrong correction file is in use for this era (e.g. a Run2-only average for 2024).
+        if not self.stat_systematics and not self.has_legacy_dddy:
+            raise RuntimeError(
+                f"data-driven estimate '{estimator}' from {str(_data_path)} carries no statistical "
+                f"nuisance for era/subera '{self.erasubera}': expected 'stat_{self.erasubera.replace('_', '')}' "
+                f"among {self.all_stat_systematics} or a legacy 'DDDY'. Wrong correction file for this era?"
+            )
 
     def estimate_dd_DY(self, jet_multiplicity, tau_pt, systematic: str = None):
         systematic = "nominal" if systematic is None else systematic
