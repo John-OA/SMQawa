@@ -5,12 +5,12 @@ import os
 import re
 import awkward as ak
 from pathlib import Path
+from coffea.util import coffea_console
 import numpy as np
 import hist
 import rich
 from hist.intervals import ratio_uncertainty
 from typing import Dict, List, Tuple, Optional
-import warnings
 
 
 def discover_systematics(json_path):
@@ -486,7 +486,7 @@ if __name__ == "__main__":
                     try:
                         corrinputs = [x.inputs for x in new_corrections if x.name == stk_key][0]
                     except IndexError as e:
-                        warnings.warn(f"Failed to find matching input for CompoundCorrection {ddcompcorrconfig_key}: {stk_key}"
+                        coffea_console.print(f"Failed to find matching input for CompoundCorrection [red]{ddcompcorrconfig_key}[/red]: {stk_key}"
                                       f"Available corrections are: {[x.name for x in new_corrections]}"
                                       )
                         raise e
