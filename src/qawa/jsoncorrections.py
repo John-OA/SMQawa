@@ -1,7 +1,6 @@
 from pathlib import Path
-import warnings
 import rich
-
+from coffea.util import coffea_console
 import correctionlib
 
 # Directory of the installed `qawa` package (.../src/qawa). Anchoring on
@@ -226,10 +225,10 @@ class CorrectionlibHandler:
                 key = cset.split(".")[0] if "." in cset else cset # strip filetype/compression
                 key = "puWeights" if "puWeights_" in key else key# strip era specifier from weights
                 if key in self._paths:
-                    warnings.warn(f"Unexpectedly overwriting {key} [{self._paths[key]}] with {path}")
+                    coffea_console.print(f"[red]Unexpectedly overwriting {key}[/red] [yellow][{self._paths[key]}][/yellow] with [blue]{path}[/blue]")
                 self._paths[key] = path
             else:
-                warnings.warn(f"Failed to load expected Central Path: {path}")
+                coffea_console.print(f"Failed to load expected Central Path: {path}")
 
     def _loadCentralExceptions(self):
         # Because there's always a special little exception to add misery to our lives
@@ -282,7 +281,7 @@ class CorrectionlibHandler:
     def __setitem__(self, key, value):
         assert value.exists()
         if key in self._paths:
-            warnings.warn(f"Unexpectedly overwriting {key} [{self._paths[key]}] with {path}")
+            coffea_console.print(f"[red]Unexpectedly overwriting {key}[/red] [yellow][{self._paths[key]}][/yellow] with [blue]{path}[/blue]")
         self._paths[key] = value
 
     def getPath(self, lookup: str, fallbackNone: bool = False):
