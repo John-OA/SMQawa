@@ -60,7 +60,8 @@ echo "----- XRD_REQUESTTIMEOUT : $XRD_REQUESTTIMEOUT"
 ls -lthr
 
 echo "----- processing the files : "
-$INSTALL_LOC_EXTERNAL/.env/bin/python3 brewer-remote-inclusive.py --jobNum=$1 --isMC={ismc} --era={era} --analysis={analysis} --zzdd={zzdd} --infile=$2 --executor={executor} --copyInput
+
+$INSTALL_LOC_EXTERNAL/.env/bin/python3 brewer-remote-inclusive.py --jobNum=$1 --isMC={ismc} --era={era} --analysis={analysis} --zzdd={zzdd} --infile=$2 --executor={executor} --copyInput {split_by_charge}
 
 echo "----- directory after running :"
 ls -lthr
@@ -107,6 +108,7 @@ def main():
     parser.add_argument("-isMC", "--isMC"  , type=int, default=1                , help="")
     parser.add_argument("--zzdd"           , type=str, default="onlySR"         , help="For vbs-ZZ and/or inc-ZZ analyses DataDriven",
                         choices=["onlySR", "DYSR", "MC"])
+    parser.add_argument("--split_by_charge", action="store_true", help="split templates by tau charge")
     parser.add_argument("-q"   , "--queue" , type=str, default="longlunch"      , help="")
     parser.add_argument("-e"   , "--era"   , type=str, default="2018"           , help="")
     parser.add_argument("-f"   , "--force" , action="store_true"                , help="recreate files and jobs")
@@ -224,6 +226,7 @@ def main():
                     ismc=auto_isMC,
                     era=options.era,
                     zzdd=options.zzdd,
+                    split_by_charge = "--split_by_charge" if options.split_by_charge else "",
                     qawa_version=qawa_version,
                     coffea_image=coffea_image,
                     full_image=full_image,

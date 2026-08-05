@@ -120,6 +120,7 @@ install_env() {
     echo "e.g. git clone -b main git@github.com:yhaddad/DCTools.git for main branch"
     echo "For current development branch, git clone -b VZ_main git@github.com:NJManganelli/DCTools.git"
   fi
+  tar -xzf /afs/cern.ch/user/n/nmangane/public/vzmain_2024jecs_temp.tar.gz # TEMP PATCH UNTIL CORRECTIONLIB JECS ARE INTEGRATED
   echo "done."
 }
 
@@ -205,6 +206,7 @@ install_env() {
     echo "e.g. git clone -b main git@github.com:yhaddad/DCTools.git for main branch"
     echo "For current development branch, git clone -b VZ_main git@github.com:NJManganelli/DCTools.git"
   fi
+  tar -xzf /afs/cern.ch/user/n/nmangane/public/vzmain_2024jecs_temp.tar.gz # TEMP PATCH UNTIL CORRECTIONLIB JECS ARE INTEGRATED
   echo "done."
 }
 

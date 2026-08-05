@@ -3,6 +3,7 @@ from coffea import nanoevents
 from coffea.nanoevents import NanoAODSchema, BaseSchema
 from coffea.util import coffea_console
 from qawa.process.coffea_sumw import coffea_sumw
+from qawa.common import nanoaod_version
 import argparse
 import pickle
 import gzip
@@ -65,6 +66,7 @@ def main():
     parser.add_argument('--runperiod', type=str, default=None             , help="run period, can be auto-parse if full dataset paths are utilized")
     parser.add_argument("--zzdd"     , type=str, default="onlySR"         , help="For vbs-ZZ and/or inc-ZZ analyses DataDriven",
                         choices=["onlySR", "DYSR", "MC"])
+    parser.add_argument("--split_by_charge", action='store_true'          , help="split templates by tau charge")
     parser.add_argument('--executor' , type=str, default="FuturesExecutor", help="Executor to use, one of IterativeExecutor (good for debugging), FuturesExecutor (multithreaded), or other coffea option")
     parser.add_argument('--copyInput', action='store_true'     , help="xrdcp a file to the worker node before executing the coffea processor on it")
     parser.add_argument('--maxChunks', '--maxchunks', type=int, default= -1, help="limit number of chunks per-file to this number at most, default '-1' to process all")
@@ -74,6 +76,7 @@ def main():
     auto_isMC = None  #if neither data or mc tag is found, keep as None
     auto_dataset = None
     auto_runperiod = ""
+    auto_ver = nanoaod_version(options.infile)
     if "NANOAODSIM" in split_args:
         auto_isMC = True
     elif "NANOAOD" in split_args:
@@ -124,10 +127,12 @@ def main():
         try:
             file_name = options.infile
             if '/store/' in options.infile:
-                if options.infile.startswith("root://"):
+                if options.infile.startswith("root://") or options.infile.startswith("file:"):
                     pass
                 else:
                     file_name = aliases[ixrd] + options.infile
+            else:
+                coffea_console.print(f"Skipping redirector prepending for file {file_name}")
 
             if options.copyInput:
                 if local_file_name is None and file_name.startswith("root://"):
@@ -162,7 +167,7 @@ def main():
                 'era': era,
                 'is_data': is_data
             }
-            runs_files = {local_file_name: "Runs" if local_file_name else file_name}
+            runs_files = {local_file_name: "Runs"} if local_file_name else {file_name: "Runs"}
             runs_samples ={
                 options.dataset:{
                     'files': runs_files,
@@ -208,12 +213,14 @@ def main():
                 -- options   = {options}
                 -- analysis  = {options.analysis}
                 -- isMC      = {options.isMC}
+                -- split_by_charge = {options.split_by_charge}
                 -- jobNum    = {options.jobNum}
                 -- era       = {options.era}
                 -- infile    = {options.infile}
                 --> {list(events_files.keys())[0]}
                 -- dataset   = {options.dataset}
                 -- period    = {options.runperiod}
+                -- version   = {auto_ver}
                 -- executor  = {options.executor}
                 -- copyInput = {options.copyInput}
                 -- maxChunks = {options.maxChunks if options.maxChunks > 0 else "None"}
@@ -231,16 +238,19 @@ def main():
                 coffea_console.print(" --- wztau2lnu_inclusive main code processor ... ")
                 proc_configured = wzinclusive_processor(
                     era=options.era,
+                    split_by_charge = options.split_by_charge,
                     ewk_process_name=ewk_flag,
-                    run_period=options.runperiod if is_data else ''
+                    run_period=options.runperiod if is_data else '',
+                    version=auto_ver,
                 )
             elif options.analysis in ["inc-WZ-Fxsec"]:
-                from qawa.process.Fxsec import wzinclusive_processor # Fiducial XSec test processor for inc-WZ
+                from qawa.process.Fxsec import wzinclusive_processor 
                 coffea_console.print(" --- wztau2lnu_inclusive FV Xsec processor ... ")
                 proc_configured = wzinclusive_processor(
                     era=options.era,
                     ewk_process_name=ewk_flag,
-                    run_period=options.runperiod if is_data else ''
+                    run_period=options.runperiod if is_data else '',
+                    version=auto_ver,
                 )
             elif options.analysis in ["trig-eff"]:
                 coffea_console.print(" --- wztau2lnu_inclusive trigger efficiency processor ... ")
@@ -273,7 +283,6 @@ def main():
             else:
                 raise NotImplementedError(f"{options.analysis} does not have hooks for loading a processor, please update the code to point appropriately to it, along with any necessary init configuration options.")
 
-            # coffea_console.print(" --- wztau2lnu_inclusive processor ... ")
             events_runner = processor.Runner(
                 executor=executor,
                 schema=NanoAODSchema,
@@ -306,8 +315,6 @@ def main():
             coffea_console.print("-------------------------------------------")
             failed=True
             ixrd += 1
-            if ixrd > (len(aliases) - 1):
-                break
 
 if __name__ == "__main__":
     main()
