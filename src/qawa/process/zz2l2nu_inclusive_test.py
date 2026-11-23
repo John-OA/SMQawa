@@ -502,7 +502,7 @@ def apply_hem_uncertainty(jets, met):
     return scaled_jets, scaled_met
 
 
-class wzinclusive_processor(processor.ProcessorABC):
+class zzinclusive_test_processor(processor.ProcessorABC):
     # TODOS:  modify purw and JMEUncertainty appropriately, also the tauID, update coffea/correctionlib versions and utilize the new clib JECs... also consider the JER, deterministic smearing
     # NEED
     #    JER Smearing broken in txt format, need to update to clib, unclear if coffea version fully ready with L1 and new MET stuff

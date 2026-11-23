@@ -232,6 +232,22 @@ def main():
                 #    version=auto_ver,
                 #)
                 is_signal = True if ('WZto3LNu' in options.dataset or 'WZTo3LNu' in options.dataset) else False
+            elif options.analysis in ["inc-PhotonCR"]:
+                # Photon control region (gamma+jets) development processor; will become the inc-ZZ photon CR
+                from qawa.process.zz2l2nu_inclusive_test import zzinclusive_test_processor
+                coffea_console.print(" --- zz2l2nu_inclusive_test (photon CR) processor ... ")
+                proc_configured = zzinclusive_test_processor(
+                    era=options.era,
+                    split_by_charge = options.split_by_charge,
+                    split_FV = options.split_FV,
+                    pol = options.pol,
+                    ewk_process_name=ewk_flag,
+                    run_period=options.runperiod if is_data else '',
+                    version=auto_ver,
+                    htau_tagger=options.htau_tagger,
+                    apply_deeptau_sf=(not options.no_deeptau_sf),
+                )
+                is_signal = False
             elif options.analysis in ["inc-WZ-Fxsec"]:
                 from qawa.process.Fxsec import wzinclusive_processor 
                 coffea_console.print(" --- wztau2lnu_inclusive FV Xsec processor ... ")
