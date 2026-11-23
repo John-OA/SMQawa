@@ -1,0 +1,160 @@
+/Muon0/Run2024C-MINIv6NANOv15-v1/NANOAOD --    
+   
+97505587   103  
+   
+/Muon0/Run2024D-MINIv6NANOv15-v1/NANOAOD --    
+   
+120787065   180  
+   
+/Muon0/Run2024E-MINIv6NANOv15-v1/NANOAOD --    
+   
+169640946   255  
+   
+/Muon0/Run2024F-MINIv6NANOv15-v1/NANOAOD --    
+   
+442432787   594  
+   
+/Muon0/Run2024G-MINIv6NANOv15-v1/NANOAOD --    
+   
+642028803   948  
+   
+/Muon0/Run2024H-MINIv6NANOv15-v1/NANOAOD --    
+93983627   152  
+   
+   
+/Muon0/Run2024I-MINIv6NANOv15-v1/NANOAOD --    
+   
+97634104   173  
+   
+/Muon0/Run2024I-MINIv6NANOv15_v2-v1/NANOAOD --    
+   
+105194627   174  
+   
+/Muon1/Run2024C-MINIv6NANOv15-v1/NANOAOD --    
+   
+97531998   94  
+   
+/Muon1/Run2024D-MINIv6NANOv15-v1/NANOAOD --    
+   
+120467371   168  
+   
+/Muon1/Run2024E-MINIv6NANOv15-v1/NANOAOD --    
+   
+172848674   171  
+   
+/Muon1/Run2024F-MINIv6NANOv15-v1/NANOAOD --    
+   
+442360423   538  
+   
+/Muon1/Run2024G-MINIv6NANOv15-v2/NANOAOD --    
+   
+641959643   565  
+   
+/Muon1/Run2024H-MINIv6NANOv15-v2/NANOAOD --    
+   
+93981102   93  
+   
+/Muon1/Run2024I-MINIv6NANOv15-v1/NANOAOD --    
+   
+97630010   94  
+   
+/Muon1/Run2024I-MINIv6NANOv15_v2-v1/NANOAOD --    
+   
+105189040   133  
+   
+/MuonEG/Run2024C-MINIv6NANOv15-v1/NANOAOD --    
+   
+18312408   35  
+   
+/MuonEG/Run2024D-MINIv6NANOv15-v1/NANOAOD --    
+   
+18827708   47  
+   
+/MuonEG/Run2024E-MINIv6NANOv15-v1/NANOAOD --    
+   
+26319233   63  
+   
+/MuonEG/Run2024F-MINIv6NANOv15-v2/NANOAOD --    
+   
+67341687   106  
+   
+/MuonEG/Run2024G-MINIv6NANOv15-v3/NANOAOD --    
+   
+97985222   150  
+   
+/MuonEG/Run2024H-MINIv6NANOv15-v2/NANOAOD --    
+14323522   25  
+   
+   
+/MuonEG/Run2024I-MINIv6NANOv15-v2/NANOAOD -- 14579063   23  
+   
+   
+   
+/MuonEG/Run2024I-MINIv6NANOv15_v2-v2/NANOAOD --    
+   
+14674636   22  
+   
+/EGamma0/Run2024C-MINIv6NANOv15-v1/NANOAOD --    
+   
+157351226   167  
+   
+/EGamma0/Run2024D-MINIv6NANOv15-v1/NANOAOD --    
+   
+156558757   173  
+   
+/EGamma0/Run2024E-MINIv6NANOv15-v1/NANOAOD --    
+   
+249417634   267  
+   
+/EGamma0/Run2024F-MINIv6NANOv15-v1/NANOAOD --    
+   
+638196622   719  
+   
+/EGamma0/Run2024G-MINIv6NANOv15-v2/NANOAOD --    
+   
+903520258   850  
+   
+/EGamma0/Run2024H-MINIv6NANOv15-v2/NANOAOD --    
+   
+134680448   138  
+   
+/EGamma0/Run2024I-MINIv6NANOv15-v1/NANOAOD --    
+   
+132904290   211  
+   
+/EGamma0/Run2024I-MINIv6NANOv15_v2-v1/NANOAOD -- 150687674   198  
+   
+   
+   
+/EGamma1/Run2024C-MINIv6NANOv15-v1/NANOAOD --    
+   
+157860731   247  
+   
+/EGamma1/Run2024D-MINIv6NANOv15-v1/NANOAOD --    
+   
+156275778   279  
+   
+/EGamma1/Run2024E-MINIv6NANOv15-v1/NANOAOD --    
+   
+249489829   335  
+   
+/EGamma1/Run2024F-MINIv6NANOv15-v1/NANOAOD --    
+   
+631079889   747  
+   
+/EGamma1/Run2024G-MINIv6NANOv15-v2/NANOAOD --    
+   
+903441926   888  
+   
+/EGamma1/Run2024H-MINIv6NANOv15-v1/NANOAOD --    
+   
+134835799   191  
+   
+/EGamma1/Run2024I-MINIv6NANOv15-v1/NANOAOD --    
+132903874   176  
+   
+   
+/EGamma1/Run2024I-MINIv6NANOv15_v2-v1/NANOAOD --    
+   
+150687112   179  
+   

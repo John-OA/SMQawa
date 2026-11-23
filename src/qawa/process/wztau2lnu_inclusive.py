@@ -1,4 +1,5 @@
 import awkward as ak
+#from cmseft.generation import weights
 import scipy.interpolate as interp
 from scipy import stats as st
 from scipy.special import expit
@@ -197,6 +198,7 @@ def build_htaus_fv(tau, nanoAODversion="v9"):
     tight_taus = ak.with_name(tight_taus, "PtEtaPhiMCandidate", )
 
     return tight_taus    
+
 def build_leptons(muons, electrons, nanoAODversion="v9", analysisID="inc-WZ-baseline", leptonIDs=None):
     # We need IDs for SFs later, since we make a tag per-analysis, we return the concrete IDs used for later SF application
     # select tight/loose muons
@@ -286,52 +288,150 @@ def build_leptons(muons, electrons, nanoAODversion="v9", analysisID="inc-WZ-base
 
     return tight_leptons, loose_leptons, non_iso_leptons
 
-def build_htaus(tau, lepton, nanoAODversion="v9", tauIDvsj_wp="VTight", tauIDvse_wp="VTight", tauIDvsmu_wp="Tight"):
+
+TAU_TAGGER_WPS = {
+    "deeptau": {
+        "kind": "index",
+        "branch": {"jet": None, "e": None, "mu": None},  # filled per-nanoAODversion below
+        "jet": None, "e": None, "mu": None,  # filled per-nanoAODversion below
+    },
+    "pnet": {
+        "kind": "score",
+        "branch": {"jet": "rawPNetVSjet", "e": "rawPNetVSe", "mu": "rawPNetVSmu"},
+        "ptcorr": "ptCorrPNet",
+        "jet": {"Loose": 0.6857, "Tight": 0.9059, "VTight": 0.9494},
+        "e": {"Tight": 0.9897}, "mu": {"Tight": 0.9451},
+    },
+    "upart": {
+        "kind": "score",
+        "branch": {"jet": "rawUParTVSjet", "e": "rawUParTVSe", "mu": "rawUParTVSmu"},
+        "ptcorr": "ptCorrUParT",
+        "jet": {"Loose": 0.1316, "Tight": 0.3956, "VTight": 0.5354},
+        "e": {"Tight": 0.9835}, "mu": {"Tight": 0.8359},
+    },
+}
+
+
+#def build_htaus(tau, lepton, nanoAODversion="v9", tauIDvsj_wp="VTight", tauIDvse_wp="VTight", tauIDvsmu_wp="Tight"):
+ #   tau_e_branch = None
+ #   tau_e_subid = None
+ #   tau_mu_subid = None
+ #   tau_mu_branch = None
+ #   tau_j_branch = None
+ #   if nanoAODversion in [f"v{V}" for V in range(12)]:
+ #       tau_max_eta = 2.3
+ #       # v9::byDeepTau2017v2p1VSe ID working points (deepTau2017v2p1): bitmask 1 = VVVLoose, 2 = VVLoose, 4 = VLoose, 8 = Loose, 16 = Medium, 32 = Tight, 64 = VTight, 128 = VVTight
+ #       tau_e_id_cuts = {"VVVLoose": 1, "VVLoose": 2, "VLoose": 4, "Loose": 8, "Medium": 16, "Tight": 32, "VTight": 64, "VVTight": 128}
+ #       tau_e_branch = tau.idDeepTau2017v2p1VSe
+ #       # v9::byDeepTau2017v2p1VSmu ID working points (deepTau2017v2p1): bitmask 1 = VLoose, 2 = Loose, 4 = Medium, 8 = Tight
+ #       tau_mu_id_cuts = {"VLoose": 1, "Loose": 2, "Medium": 4, "Tight": 8}
+ #       tau_mu_branch = tau.idDeepTau2017v2p1VSmu
+ #       # v9::byDeepTau2017v2p1VSjet ID working points (deepTau2017v2p1): bitmask 1 = VVVLoose, 2 = VVLoose, 4 = VLoose, 8 = Loose, 16 = Medium, 32 = Tight, 64 = VTight, 128 = VVTight
+ #       tau_j_id_cuts = {"VVVLoose": 1, "VVLoose": 2, "VLoose": 4, "Loose": 8, "Medium": 16, "Tight": 32, "VTight": 64, "VVTight": 128}
+ #       tau_j_branch = tau.idDeepTau2017v2p1VSjet
+ #   elif nanoAODversion in ["v15"]:
+ #       tau_max_eta = 2.5
+ #       # v15::byDeepTau2018v2p5VSe ID working points (deepTau2018v2p5): 1 = VVVLoose, 2 = VVLoose, 3 = VLoose, 4 = Loose, 5 = Medium, 6 = Tight, 7 = VTight, 8 = VVTight
+ #       tau_e_id_cuts = {"VVVLoose": 1, "VVLoose": 2, "VLoose": 3, "Loose": 4, "Medium": 5, "Tight": 6, "VTight": 7, "VVTight": 8}
+ #       tau_e_branch = tau.idDeepTau2018v2p5VSe
+ #       # v15::byDeepTau2018v2p5VSmu ID working points (deepTau2018v2p5): 1 = VLoose, 2 = Loose, 3 = Medium, 4 = Tight
+ #       tau_mu_id_cuts = {"VLoose": 1, "Loose": 2, "Medium": 3, "Tight": 4}
+ #       tau_mu_branch = tau.idDeepTau2018v2p5VSmu
+ #       # v15::byDeepTau2018v2p5VSjet ID working points (deepTau2018v2p5): 1 = VVVLoose, 2 = VVLoose, 3 = VLoose, 4 = Loose, 5 = Medium, 6 = Tight, 7 = VTight, 8 = VVTight
+ #       tau_j_id_cuts = {"VVVLoose": 1, "VVLoose": 2, "VLoose": 3, "Loose": 4, "Medium": 5, "Tight": 6, "VTight": 7, "VVTight": 8}
+ #       tau_j_branch = tau.idDeepTau2018v2p5VSjet
+ #   else:
+ #       raise NotImplementedError
+
+#    if tauIDvse_wp not in tau_e_id_cuts:
+#        raise ValueError(f"Available levels for tauIDvse_wp: {list(tauIDvse_wp.keys())}")
+#    else:
+#        tau_e_subid = (tau_e_branch >= tau_e_id_cuts[tauIDvse_wp])
+#    if tauIDvsmu_wp not in tau_mu_id_cuts:
+#        raise ValueError(f"Available levels for tauIDvmu_wp: {list(tauIDvsmu_wp.keys())}")
+#    else:
+#        tau_mu_subid = (tau_mu_branch >= tau_mu_id_cuts[tauIDvsmu_wp])
+#    if tauIDvsj_wp not in tau_j_id_cuts:
+#        raise ValueError(f"Available levels for tauIDvj_wp: {list(tauIDvsj_wp.keys())}")
+#    else:
+#        tau_j_subid = (tau_j_branch >= tau_j_id_cuts[tauIDvsj_wp])
+#
+#    base_selection = (
+#        (tau.pt         > 20 ) & 
+#        (np.abs(tau.eta) < tau_max_eta ) &
+#        (np.abs(tau.dz)< 0.2 ) &
+#        (tau.decayMode != 5   ) &
+#        (tau.decayMode != 6   ) &
+#        tau_e_subid & tau_mu_subid & tau_j_subid
+#    )
+
+#    overlap_leptons = ak.any(
+#        tau.metric_table(lepton) <= 0.4,
+#        axis=2
+#    )
+
+#    return tau[base_selection & ~overlap_leptons]
+
+def build_htaus(tau, lepton, nanoAODversion="v9", tauIDvsj_wp="VTight", tauIDvse_wp="VTight", tauIDvsmu_wp="Tight", tagger="deeptau"):
     tau_e_branch = None
     tau_e_subid = None
     tau_mu_subid = None
     tau_mu_branch = None
     tau_j_branch = None
-    if nanoAODversion in [f"v{V}" for V in range(12)]:
-        tau_max_eta = 2.3
-        # v9::byDeepTau2017v2p1VSe ID working points (deepTau2017v2p1): bitmask 1 = VVVLoose, 2 = VVLoose, 4 = VLoose, 8 = Loose, 16 = Medium, 32 = Tight, 64 = VTight, 128 = VVTight
-        tau_e_id_cuts = {"VVVLoose": 1, "VVLoose": 2, "VLoose": 4, "Loose": 8, "Medium": 16, "Tight": 32, "VTight": 64, "VVTight": 128}
-        tau_e_branch = tau.idDeepTau2017v2p1VSe
-        # v9::byDeepTau2017v2p1VSmu ID working points (deepTau2017v2p1): bitmask 1 = VLoose, 2 = Loose, 4 = Medium, 8 = Tight
-        tau_mu_id_cuts = {"VLoose": 1, "Loose": 2, "Medium": 4, "Tight": 8}
-        tau_mu_branch = tau.idDeepTau2017v2p1VSmu
-        # v9::byDeepTau2017v2p1VSjet ID working points (deepTau2017v2p1): bitmask 1 = VVVLoose, 2 = VVLoose, 4 = VLoose, 8 = Loose, 16 = Medium, 32 = Tight, 64 = VTight, 128 = VVTight
-        tau_j_id_cuts = {"VVVLoose": 1, "VVLoose": 2, "VLoose": 4, "Loose": 8, "Medium": 16, "Tight": 32, "VTight": 64, "VVTight": 128}
-        tau_j_branch = tau.idDeepTau2017v2p1VSjet
-    elif nanoAODversion in ["v15"]:
-        tau_max_eta = 2.5
-        # v15::byDeepTau2018v2p5VSe ID working points (deepTau2018v2p5): 1 = VVVLoose, 2 = VVLoose, 3 = VLoose, 4 = Loose, 5 = Medium, 6 = Tight, 7 = VTight, 8 = VVTight
-        tau_e_id_cuts = {"VVVLoose": 1, "VVLoose": 2, "VLoose": 3, "Loose": 4, "Medium": 5, "Tight": 6, "VTight": 7, "VVTight": 8}
-        tau_e_branch = tau.idDeepTau2018v2p5VSe
-        # v15::byDeepTau2018v2p5VSmu ID working points (deepTau2018v2p5): 1 = VLoose, 2 = Loose, 3 = Medium, 4 = Tight
-        tau_mu_id_cuts = {"VLoose": 1, "Loose": 2, "Medium": 3, "Tight": 4}
-        tau_mu_branch = tau.idDeepTau2018v2p5VSmu
-        # v15::byDeepTau2018v2p5VSjet ID working points (deepTau2018v2p5): 1 = VVVLoose, 2 = VVLoose, 3 = VLoose, 4 = Loose, 5 = Medium, 6 = Tight, 7 = VTight, 8 = VVTight
-        tau_j_id_cuts = {"VVVLoose": 1, "VVLoose": 2, "VLoose": 3, "Loose": 4, "Medium": 5, "Tight": 6, "VTight": 7, "VVTight": 8}
-        tau_j_branch = tau.idDeepTau2018v2p5VSjet
-    else:
-        raise NotImplementedError
 
-    if tauIDvse_wp not in tau_e_id_cuts:
-        raise ValueError(f"Available levels for tauIDvse_wp: {list(tauIDvse_wp.keys())}")
-    else:
+    if tagger == "deeptau":
+        if nanoAODversion in [f"v{V}" for V in range(12)]:
+            tau_max_eta = 2.3
+            tau_e_id_cuts = {"VVVLoose": 1, "VVLoose": 2, "VLoose": 4, "Loose": 8, "Medium": 16, "Tight": 32, "VTight": 64, "VVTight": 128}
+            tau_e_branch = tau.idDeepTau2017v2p1VSe
+            tau_mu_id_cuts = {"VLoose": 1, "Loose": 2, "Medium": 4, "Tight": 8}
+            tau_mu_branch = tau.idDeepTau2017v2p1VSmu
+            tau_j_id_cuts = {"VVVLoose": 1, "VVLoose": 2, "VLoose": 4, "Loose": 8, "Medium": 16, "Tight": 32, "VTight": 64, "VVTight": 128}
+            tau_j_branch = tau.idDeepTau2017v2p1VSjet
+        elif nanoAODversion in ["v15"]:
+            tau_max_eta = 2.5
+            tau_e_id_cuts = {"VVVLoose": 1, "VVLoose": 2, "VLoose": 3, "Loose": 4, "Medium": 5, "Tight": 6, "VTight": 7, "VVTight": 8}
+            tau_e_branch = tau.idDeepTau2018v2p5VSe
+            tau_mu_id_cuts = {"VLoose": 1, "Loose": 2, "Medium": 3, "Tight": 4}
+            tau_mu_branch = tau.idDeepTau2018v2p5VSmu
+            tau_j_id_cuts = {"VVVLoose": 1, "VVLoose": 2, "VLoose": 3, "Loose": 4, "Medium": 5, "Tight": 6, "VTight": 7, "VVTight": 8}
+            tau_j_branch = tau.idDeepTau2018v2p5VSjet
+        else:
+            raise NotImplementedError
+
+        if tauIDvse_wp not in tau_e_id_cuts:
+            raise ValueError(f"Available levels for tauIDvse_wp: {list(tau_e_id_cuts.keys())}")
         tau_e_subid = (tau_e_branch >= tau_e_id_cuts[tauIDvse_wp])
-    if tauIDvsmu_wp not in tau_mu_id_cuts:
-        raise ValueError(f"Available levels for tauIDvmu_wp: {list(tauIDvsmu_wp.keys())}")
-    else:
+        if tauIDvsmu_wp not in tau_mu_id_cuts:
+            raise ValueError(f"Available levels for tauIDvmu_wp: {list(tau_mu_id_cuts.keys())}")
         tau_mu_subid = (tau_mu_branch >= tau_mu_id_cuts[tauIDvsmu_wp])
-    if tauIDvsj_wp not in tau_j_id_cuts:
-        raise ValueError(f"Available levels for tauIDvj_wp: {list(tauIDvsj_wp.keys())}")
-    else:
+        if tauIDvsj_wp not in tau_j_id_cuts:
+            raise ValueError(f"Available levels for tauIDvj_wp: {list(tau_j_id_cuts.keys())}")
         tau_j_subid = (tau_j_branch >= tau_j_id_cuts[tauIDvsj_wp])
+        tau_pt_corrected = tau.pt
+
+    elif tagger in ("pnet", "upart"):
+        # PNet/UParT only exist for NanoAODv15 (2024+)
+        tau_max_eta = 2.5
+        spec = TAU_TAGGER_WPS[tagger]
+
+        if tauIDvse_wp not in spec["e"]:
+            raise ValueError(f"Available levels for tauIDvse_wp ({tagger}): {list(spec['e'].keys())}")
+        tau_e_subid = np.isfinite(tau[spec["branch"]["e"]]) & (tau[spec["branch"]["e"]] > spec["e"][tauIDvse_wp])
+        if tauIDvsmu_wp not in spec["mu"]:
+            raise ValueError(f"Available levels for tauIDvmu_wp ({tagger}): {list(spec['mu'].keys())}")
+        tau_mu_subid = np.isfinite(tau[spec["branch"]["mu"]]) & (tau[spec["branch"]["mu"]] > spec["mu"][tauIDvsmu_wp])
+        if tauIDvsj_wp not in spec["jet"]:
+            raise ValueError(f"Available levels for tauIDvj_wp ({tagger}): {list(spec['jet'].keys())}")
+        tau_j_subid = np.isfinite(tau[spec["branch"]["jet"]]) & (tau[spec["branch"]["jet"]] > spec["jet"][tauIDvsj_wp])
+
+        # PNet/UParT recovered candidates carry a raw jet pT -- ptCorr fixes that up.
+        tau_pt_corrected = tau.pt * tau[spec["ptcorr"]]
+    else:
+        raise ValueError(f"Unknown tagger {tagger!r}, expected one of: deeptau, pnet, upart")
 
     base_selection = (
-        (tau.pt         > 20 ) & 
+        (tau_pt_corrected > 20 ) &
         (np.abs(tau.eta) < tau_max_eta ) &
         (np.abs(tau.dz)< 0.2 ) &
         (tau.decayMode != 5   ) &
@@ -410,7 +510,9 @@ class wzinclusive_processor(processor.ProcessorABC):
     #    Update inc-ZZ to utilize the same interfaces
     # NICE TO HAVE / DEFER
     #    Switch to correctionlib JECS + Type1 MET when coffea implementation for MET and JME implementation of "L1" only correction can be loaded/built
-    def __init__(self, era: str ='2018', ewk_process_name=None, run_period: str = '', split_by_charge:bool = False, split_FV:bool = False, pol:bool = False, version="v9",):
+    #def __init__(self, era: str ='2018', ewk_process_name=None, run_period: str = '', split_by_charge:bool = False, split_FV:bool = False, pol:bool = False, version="v9",):
+    #def __init__(self, era: str ='2018', ewk_process_name=None, run_period: str = '', split_by_charge:bool = False, split_FV:bool = False, pol:bool = False, version="v9", htau_tagger:str = "deeptau",):
+    def __init__(self, era: str ='2018', ewk_process_name=None, run_period: str = '', split_by_charge:bool = False, split_FV:bool = False, pol:bool = False, version="v9", htau_tagger:str = "deeptau", apply_deeptau_sf:bool = True,):
         self._era = era
         self._split_by_charge = split_by_charge
         self._split_FV = split_FV
@@ -489,6 +591,8 @@ class wzinclusive_processor(processor.ProcessorABC):
             else:
                 raise ValueError(f"Unexpected era={self._era}")
         
+        self.htau_tagger = htau_tagger
+        self.apply_deeptau_sf = apply_deeptau_sf  # set False to disable DeepTau ID SF (validation check)
         self.btag_wp = 'L'
         self.btag_tagger = "deepJet" if self._ver in [f"v{V}" for V in range(12)] else "UParTAK4"
         self.jetPU_wp = 'M'
@@ -1126,10 +1230,13 @@ class wzinclusive_processor(processor.ProcessorABC):
         ntight_lep = ak.num(tight_lep)
         nloose_lep = ak.num(loose_lep)
 
+        had_taus = build_htaus(event.Tau, tight_lep, nanoAODversion=self._ver, tauIDvsj_wp="VTight", tauIDvse_wp=self.tauIDvse_wp, tauIDvsmu_wp=self.tauIDvsmu_wp, tagger=self.htau_tagger)
+        had_taus_tight = build_htaus(event.Tau, tight_lep, nanoAODversion=self._ver, tauIDvsj_wp="Tight", tauIDvse_wp=self.tauIDvse_wp, tauIDvsmu_wp=self.tauIDvsmu_wp, tagger=self.htau_tagger)
+        had_taus_loose = build_htaus(event.Tau, tight_lep, nanoAODversion=self._ver, tauIDvsj_wp="Loose", tauIDvse_wp=self.tauIDvse_wp, tauIDvsmu_wp=self.tauIDvsmu_wp, tagger=self.htau_tagger)
         
-        had_taus = build_htaus(event.Tau, tight_lep, nanoAODversion=self._ver, tauIDvsj_wp="VTight", tauIDvse_wp=self.tauIDvse_wp, tauIDvsmu_wp=self.tauIDvsmu_wp)
-        had_taus_tight = build_htaus(event.Tau, tight_lep, nanoAODversion=self._ver, tauIDvsj_wp="Tight", tauIDvse_wp=self.tauIDvse_wp, tauIDvsmu_wp=self.tauIDvsmu_wp)
-        had_taus_loose = build_htaus(event.Tau, tight_lep, nanoAODversion=self._ver, tauIDvsj_wp="Loose", tauIDvse_wp=self.tauIDvse_wp, tauIDvsmu_wp=self.tauIDvsmu_wp)
+        #had_taus = build_htaus(event.Tau, tight_lep, nanoAODversion=self._ver, tauIDvsj_wp="VTight", tauIDvse_wp=self.tauIDvse_wp, tauIDvsmu_wp=self.tauIDvsmu_wp)
+        #had_taus_tight = build_htaus(event.Tau, tight_lep, nanoAODversion=self._ver, tauIDvsj_wp="Tight", tauIDvse_wp=self.tauIDvse_wp, tauIDvsmu_wp=self.tauIDvsmu_wp)
+        #had_taus_loose = build_htaus(event.Tau, tight_lep, nanoAODversion=self._ver, tauIDvsj_wp="Loose", tauIDvse_wp=self.tauIDvse_wp, tauIDvsmu_wp=self.tauIDvsmu_wp)
 
         # sort tau collections
         vtight_tau_sorter = ak.argsort(had_taus.pt, axis=1, ascending=False)
@@ -1562,10 +1669,29 @@ class wzinclusive_processor(processor.ProcessorABC):
                 if self._process_shift_warnings:
                     coffea_console.print("[red]JET PU ID SFs DISABLED[/red]")
             self._purw.append_pileup_weight(weights, event.Pileup.nTrueInt) # fix: https://github.com/9GaoHong/SMQawa_update/commit/d6cdebda4856593162c03365eb9d9a91ceb1a185
-            self._tauID.append_tauID_multiwp_sf(had_taus, had_taus_tight, had_taus_loose,
-                                                tau_mask_vtight, tau_mask_tight, tau_mask_loose,
-                                                weights
-                                                )
+            #if self.htau_tagger == "deeptau":
+            if self.htau_tagger == "deeptau" and self.apply_deeptau_sf:
+                self._tauID.append_tauID_multiwp_sf(had_taus, had_taus_tight, had_taus_loose,
+                                                    tau_mask_vtight, tau_mask_tight, tau_mask_loose,
+                                                    weights
+                                                    )
+            else:
+                # No TAU POG scale factors exist yet for PNet/UParT -- apply explicit
+                # no-op weights (1.0, no variation) under the SAME weight names, rather
+                # than silently reusing DeepTau's calibration on a different tagger's
+                # selected taus. This keeps weights.variations identical across taggers
+                # so nothing downstream breaks, while making clear the yields are
+                # selection-only for pnet/upart.
+                weights.add('tauIDvsjet_sf', _ones, _ones, _ones)
+                weights.add('tauIDvse_sf',   _ones, _ones, _ones)
+                weights.add('tauIDvsmu_sf',  _ones, _ones, _ones)
+            # self._tauID.append_tauID_sf(had_taus, weights)
+            
+            #self._purw.append_pileup_weight(weights, event.Pileup.nTrueInt) # fix: https://github.com/9GaoHong/SMQawa_update/commit/d6cdebda4856593162c03365eb9d9a91ceb1a185
+            #self._tauID.append_tauID_multiwp_sf(had_taus, had_taus_tight, had_taus_loose,
+            #                                    tau_mask_vtight, tau_mask_tight, tau_mask_loose,
+            #                                    weights
+            #                                    )
             # self._tauID.append_tauID_sf(had_taus, weights)
             self._add_trigger_sf(weights, lead_lep, subl_lep, clibhandler=self.clibhandler)
             self._leSF.append_lepton_sf(lead_lep, subl_lep, weights)

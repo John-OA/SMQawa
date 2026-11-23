@@ -70,6 +70,8 @@ def main():
     parser.add_argument("--split_by_charge", action='store_true'          , help="split templates by tau charge")
     parser.add_argument("--split_FV", action='store_true'          , help="split signal into IFV and OFV")
     parser.add_argument("--pol", action='store_true'          , help="Fill the histogram with polarization weights")
+    parser.add_argument("--htau_tagger", type=str, default="deeptau", choices=["deeptau", "pnet", "upart"], help="hadronic tau ID algorithm to use for tau selection")
+    parser.add_argument("--no_deeptau_sf", action='store_true', help="disable DeepTau ID scale factors (validation check: compare taggers with all SF off)")
     parser.add_argument('--executor' , type=str, default="FuturesExecutor", help="Executor to use, one of IterativeExecutor (good for debugging), FuturesExecutor (multithreaded), or other coffea option")
     parser.add_argument('--copyInput', action='store_true'     , help="xrdcp a file to the worker node before executing the coffea processor on it")
     parser.add_argument('--maxChunks', '--maxchunks', type=int, default= -1, help="limit number of chunks per-file to this number at most, default '-1' to process all")
@@ -101,7 +103,7 @@ def main():
         options.dataset = auto_dataset
     executor = None
     if options.executor == "FuturesExecutor":
-        executor = processor.FuturesExecutor(workers=8,)
+        executor = processor.FuturesExecutor(workers=2,)
     elif options.executor == "IterativeExecutor":
         executor = processor.IterativeExecutor()
     elif options.executor == "DaskExecutor":
@@ -197,6 +199,17 @@ def main():
             if options.analysis in ["inc-WZ"]:
                 from qawa.process.wztau2lnu_inclusive import wzinclusive_processor
                 coffea_console.print(" --- wztau2lnu_inclusive main code processor ... ")
+                
+                #proc_configured = wzinclusive_processor(
+                #    era=options.era,
+                #    split_by_charge = options.split_by_charge,
+                #    split_FV = options.split_FV,
+                #    pol = options.pol,
+                #    ewk_process_name=ewk_flag,
+                #    run_period=options.runperiod if is_data else '',
+                #    version=auto_ver,
+                #    htau_tagger=options.htau_tagger,
+                #)
                 proc_configured = wzinclusive_processor(
                     era=options.era,
                     split_by_charge = options.split_by_charge,
@@ -205,7 +218,19 @@ def main():
                     ewk_process_name=ewk_flag,
                     run_period=options.runperiod if is_data else '',
                     version=auto_ver,
+                    htau_tagger=options.htau_tagger,
+                    apply_deeptau_sf=(not options.no_deeptau_sf),
                 )
+                
+                #proc_configured = wzinclusive_processor(
+                #    era=options.era,
+                #    split_by_charge = options.split_by_charge,
+                #    split_FV = options.split_FV,
+                #    pol = options.pol,
+                #    ewk_process_name=ewk_flag,
+                #    run_period=options.runperiod if is_data else '',
+                #    version=auto_ver,
+                #)
                 is_signal = True if ('WZto3LNu' in options.dataset or 'WZTo3LNu' in options.dataset) else False
             elif options.analysis in ["inc-WZ-Fxsec"]:
                 from qawa.process.Fxsec import wzinclusive_processor 

@@ -61,7 +61,7 @@ ls -lthr
 
 echo "----- processing the files : "
 
-$INSTALL_LOC_EXTERNAL/.env/bin/python3 brewer-remote-inclusive.py --jobNum=$1 --isMC={ismc} --era={era} --analysis={analysis} --zzdd={zzdd} --infile=$2 --executor={executor} --copyInput {split_by_charge}
+$INSTALL_LOC_EXTERNAL/.env/bin/python3 brewer-remote-inclusive.py --jobNum=$1 --isMC={ismc} --era={era} --analysis={analysis} --zzdd={zzdd} --infile=$2 --executor={executor} --copyInput {split_by_charge} --htau_tagger={htau_tagger} {no_deeptau_sf}
 
 echo "----- directory after running :"
 ls -lthr
@@ -117,6 +117,8 @@ def main():
     parser.add_argument("--redo-proxy"     , action="store_true"                , help="redo the voms proxy")
     parser.add_argument("-ex", "--executor", type=str, default="FuturesExecutor", help="coffea executor to use",
                         choices=["FuturesExecutor","IterativeExecutor","DaskExecutor"])
+    parser.add_argument("--htau_tagger", type=str, default="deeptau", choices=["deeptau", "pnet", "upart"], help="hadronic tau ID algorithm to use")
+    parser.add_argument("--no_deeptau_sf", action='store_true', help="disable DeepTau ID scale factors (validation check)")
     options = parser.parse_args()
 
     # Making sure that the proxy is good
@@ -232,6 +234,8 @@ def main():
                     full_image=full_image,
                     install_loc_external=install_loc_external,
                     executor=options.executor,
+                    htau_tagger=options.htau_tagger,
+                    no_deeptau_sf = "--no_deeptau_sf" if options.no_deeptau_sf else "",
                 )
                 scriptfile.write(script)
                 scriptfile.close()

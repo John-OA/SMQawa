@@ -40,4 +40,6 @@ MANIFEST
 *.root
 *.pkl
 *.pyc
-*.DS_store
+*.DS_store.DS_Store
+._.DS_Store
+final_merged_hists/
