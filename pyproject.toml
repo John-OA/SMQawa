@@ -35,8 +35,12 @@ dependencies = [
     "coffea>=0.7.15",
     "vector",
     "onnxruntime",
-    "scipy"
+    "scipy",
+    "PyYAML"
 ]
+
+[project.optional-dependencies]
+histserv = ["histserv>=0.2.1,<0.3"]
 
 [build-system]
 # requires = ["setuptools>=75.8.2", "wheel"]

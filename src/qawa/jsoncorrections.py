@@ -14,41 +14,47 @@ _QAWA_DIR = Path(__file__).resolve().parent
 _QAWA_DATA = _QAWA_DIR / "data"
 
 _runIII_v15_pogs_tags_pogtags_csets = (
-    ("DC", "Collisions22", "2026-02-26", "Cert_Collisions2022_355100_362760_Golden.json"),
-    ("DC", "Collisions23", "2026-02-26", "Cert_Collisions2023_366442_370790_Golden.json"),
-    ("DC", "Collisions24", "2026-02-25", "Cert_Collisions2024_378981_386951_Golden.json"),
-    ("DC", "Collisions25", "2026-02-04", "Cert_Collisions2025_391658_398903_Golden.json"),
-    ("LUM", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2025-12-02", "puWeights_BCDEFGHI.json.gz"),
+    ("DC", "Collisions22", "2026-05-28", "Cert_Collisions2022_355100_362760_Golden.json"),
+    ("DC", "Collisions23", "2026-05-28", "Cert_Collisions2023_366442_370790_Golden.json"),
+    ("DC", "Collisions24", "2026-08-04", "Cert_Collisions2024_378981_386951_Golden.json"),
+    ("DC", "Collisions25", "2026-07-30", "Cert_Collisions2025_391658_398903_Golden.json"),
+    ("LUM", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2026-04-15", "puWeights_BCDEFGHI.json.gz"),
+    ("LUM", "Run3-25Prompt-Summer24-NanoAODv15", "2026-06-05", "puWeights_2025pp_Golden_Summer24_25ns_69200ub.json.gz"),
 
-    ("BTV", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2026-03-10", "btagging.json.gz"),
-    ("BTV", "Run3-25Prompt-Summer24-NanoAODv15", "add_2025_b_and_c_WPs", "btagging.json.gz"),
+    ("BTV", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2026-10-20", "btagging.json.gz"),
+    ("BTV", "Run3-25Prompt-Summer24-NanoAODv15", "2026-10-14", "btagging.json.gz"),
 
-    # MISSING: met_xyCorrections, 2025 jetid, ...
-    ("JME", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2025-12-02", "fatJet_jerc.json.gz"),
-    ("JME", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2025-12-02", "jet_jerc.json.gz"),
-    ("JME", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2025-12-02", "jetid.json.gz"),
-    ("JME", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2025-12-02", "jetvetomaps.json.gz"),
-    ("JME", "Run3-25Prompt-Winter25-NanoAODv15", "2026-02-09", "fatJet_jerc.json.gz"),
-    ("JME", "Run3-25Prompt-Winter25-NanoAODv15", "2026-02-09", "jet_jerc.json.gz"),
-    ("JME", "Run3-25Prompt-Winter25-NanoAODv15", "2026-02-09", "jetvetomaps.json.gz"),
+    # MISSING: met_xyCorrections, ...
+    ("JME", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2026-07-16", "fatJet_jerc.json.gz"),
+    ("JME", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2026-07-16", "jet_jerc.json.gz"),
+    ("JME", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2026-07-16", "jetid.json.gz"),
+    ("JME", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2026-07-16", "jetvetomaps.json.gz"),
+    ("JME", "Run3-25Prompt-Summer24-NanoAODv15", "2026-07-16", "fatJet_jerc.json.gz"),
+    ("JME", "Run3-25Prompt-Summer24-NanoAODv15", "2026-07-16", "jet_jerc.json.gz"),
+    ("JME", "Run3-25Prompt-Summer24-NanoAODv15", "2026-07-16", "jetid.json.gz"),
+    ("JME", "Run3-25Prompt-Summer24-NanoAODv15", "2026-07-16", "jetvetomaps.json.gz"),
 
 
     ("EGM", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2025-12-15", "electron.json.gz"),
     ("EGM", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2025-12-15", "photon.json.gz"),
     ("EGM", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2025-12-15", "electronSS_EtDependent.json.gz"),
     ("EGM", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2025-12-15", "photonSS_EtDependent.json.gz"),    
-    ("EGM", "Run3-25Prompt-Summer24-NanoAODv15", "2026-01-22", "electronSS_EtDependent.json.gz"),
-    ("EGM", "Run3-25Prompt-Summer24-NanoAODv15", "2026-01-22", "photonSS_EtDependent.json.gz"),
+    ("EGM", "Run3-25Prompt-Summer24-NanoAODv15", "2026-06-26", "electron.json.gz"),
+    ("EGM", "Run3-25Prompt-Summer24-NanoAODv15", "2026-06-26", "photon.json.gz"),
+    ("EGM", "Run3-25Prompt-Summer24-NanoAODv15", "2026-06-26", "electronSS_EtDependent.json.gz"),
+    ("EGM", "Run3-25Prompt-Summer24-NanoAODv15", "2026-06-26", "photonSS_EtDependent.json.gz"),
 
     # Missing  muon_JPsi.json.gz in 2025
     # ("MUO", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2025-11-27", "muon_HighPt.json.gz"),
-    ("MUO", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2025-11-27", "muon_JPsi.json.gz"),
-    ("MUO", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2025-11-27", "muon_Z.json.gz"),
-    ("MUO", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2025-11-27", "muon_scalesmearing.json.gz"),
-    # ("MUO", "Run3-25Prompt-Summer24-NanoAODv15", "2026-04-13", "muon_HighPt.json.gz"),
-    # ("MUO", "Run3-25Prompt-Summer24-NanoAODv15", "2026-04-13", "muon_Z.json.gz"), # Causes a crash in correctionlib 2.7.0, not likely fixed in 2.8.0 but perhaps...
+    ("MUO", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2026-06-18", "muon_JPsi.json.gz"),
+    ("MUO", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2026-06-18", "muon_Z.json.gz"),
+    ("MUO", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2026-06-18", "muon_scalesmearing.json.gz"),
+    ("MUO", "Run3-25Prompt-Summer24-NanoAODv15", "2026-10-27", "muon_JPsi.json.gz"),
+    ("MUO", "Run3-25Prompt-Summer24-NanoAODv15", "2026-10-27", "muon_Z.json.gz"),
+    ("MUO", "Run3-25Prompt-Summer24-NanoAODv15", "2026-10-27", "muon_scalesmearing.json.gz"),
 
     ("TAU", "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15", "2026-01-14", "tau.json.gz"),
+    ("TAU", "Run3-25Prompt-Summer24-NanoAODv15", "2026-08-05", "tau.json.gz"),
 )
 _runII_v15_pogs_tags_pogtags_csets = (
     ("LUM", "Run2-2016postVFP-UL-NanoAODv9", "2021-09-10", "puWeights.json.gz"),
@@ -56,27 +62,23 @@ _runII_v15_pogs_tags_pogtags_csets = (
     ("LUM", "Run2-2017-UL-NanoAODv9", "2021-09-10", "puWeights.json.gz"),
     ("LUM", "Run2-2018-UL-NanoAODv9", "2021-09-10", "puWeights.json.gz"),
 
-    ("BTV", "Run2-2016preVFP-UL-NanoAODv15", "add_btagging_wps", "btagging.json.gz"),
-    ("BTV", "Run2-2016postVFP-UL-NanoAODv15", "add_b_tagging_WPs", "btagging.json.gz"),
-    ("BTV", "Run2-2017-UL-NanoAODv15", "add_b_tagging_WPs", "btagging.json.gz"),
-    ("BTV", "Run2-2018-UL-NanoAODv15", "add_b_tagging_WPs", "btagging.json.gz"),
+    ("BTV", "Run2-2016preVFP-UL-NanoAODv15", "2026-06-18", "btagging.json.gz"),
+    ("BTV", "Run2-2016postVFP-UL-NanoAODv15", "2026-06-18", "btagging.json.gz"),
+    ("BTV", "Run2-2017-UL-NanoAODv15", "2026-06-18", "btagging.json.gz"),
+    ("BTV", "Run2-2018-UL-NanoAODv15", "2026-06-18", "btagging.json.gz"),
 
     ("JME", "Run2-2016postVFP-UL-NanoAODv15", "2026-06-05", "jet_jerc.json.gz"),
     ("JME", "Run2-2016postVFP-UL-NanoAODv15", "2026-06-05", "jetvetomaps.json.gz"),
     # ("JME", "Run2-2016postVFP-UL-NanoAODv15", "2026-06-05", "jmar.json.gz"),
-    ("JME", "Run2-2016postVFP-UL-NanoAODv15", "22026-06-05", "met.json.gz"),
     ("JME", "Run2-2016preVFP-UL-NanoAODv15", "2026-06-05", "jet_jerc.json.gz"),
     ("JME", "Run2-2016preVFP-UL-NanoAODv15", "2026-06-05", "jetvetomaps.json.gz"),
     # ("JME", "Run2-2016preVFP-UL-NanoAODv15", "2026-06-05", "jmar.json.gz"),
-    ("JME", "Run2-2016preVFP-UL-NanoAODv15", "2026-06-051", "met.json.gz"),
     ("JME", "Run2-2017-UL-NanoAODv15", "2026-06-05", "jet_jerc.json.gz"),
     ("JME", "Run2-2017-UL-NanoAODv15", "2026-06-05", "jetvetomaps.json.gz"),
     # ("JME", "Run2-2017-UL-NanoAODv15", "2026-06-05", "jmar.json.gz"),
-    ("JME", "Run2-2017-UL-NanoAODv15", "2026-06-05", "met.json.gz"),
     ("JME", "Run2-2018-UL-NanoAODv15", "2026-06-05", "jet_jerc.json.gz"),
     ("JME", "Run2-2018-UL-NanoAODv15", "2026-06-05", "jetvetomaps.json.gz"),
     # ("JME", "Run2-2018-UL-NanoAODv15", "2026-06-05", "jmar.json.gz"),
-    ("JME", "Run2-2018-UL-NanoAODv15", "2026-06-05", "met.json.gz"),
 
     ("EGM", "Run2-2016preVFP-UL-NanoAODv15", "2025-12-05", "electron.json.gz"),
     ("EGM", "Run2-2016preVFP-UL-NanoAODv15", "2025-12-05", "electronSS_EtDependent.json.gz"),
@@ -121,22 +123,22 @@ _runII_v9_pogs_tags_pogtags_csets = (
     ("BTV", "Run2-2017-UL-NanoAODv9", "2025-08-19", "btagging.json.gz"),
     ("BTV", "Run2-2018-UL-NanoAODv9", "2025-08-19", "btagging.json.gz"),
 
-    ("JME", "Run2-2016postVFP-UL-NanoAODv9", "2025-04-11", "jet_jerc.json.gz"),
-    ("JME", "Run2-2016postVFP-UL-NanoAODv9", "2025-04-11", "jetvetomaps.json.gz"),
-    ("JME", "Run2-2016postVFP-UL-NanoAODv9", "2025-04-11", "jmar.json.gz"),
-    ("JME", "Run2-2016postVFP-UL-NanoAODv9", "2025-04-11", "met.json.gz"),
-    ("JME", "Run2-2016preVFP-UL-NanoAODv9", "2025-04-11", "jet_jerc.json.gz"),
-    ("JME", "Run2-2016preVFP-UL-NanoAODv9", "2025-04-11", "jetvetomaps.json.gz"),
-    ("JME", "Run2-2016preVFP-UL-NanoAODv9", "2025-04-11", "jmar.json.gz"),
-    ("JME", "Run2-2016preVFP-UL-NanoAODv9", "2025-04-11", "met.json.gz"),
-    ("JME", "Run2-2017-UL-NanoAODv9", "2025-04-11", "jet_jerc.json.gz"),
-    ("JME", "Run2-2017-UL-NanoAODv9", "2025-04-11", "jetvetomaps.json.gz"),
-    ("JME", "Run2-2017-UL-NanoAODv9", "2025-04-11", "jmar.json.gz"),
-    ("JME", "Run2-2017-UL-NanoAODv9", "2025-04-11", "met.json.gz"),
-    ("JME", "Run2-2018-UL-NanoAODv9", "2025-04-11", "jet_jerc.json.gz"),
-    ("JME", "Run2-2018-UL-NanoAODv9", "2025-04-11", "jetvetomaps.json.gz"),
-    ("JME", "Run2-2018-UL-NanoAODv9", "2025-04-11", "jmar.json.gz"),
-    ("JME", "Run2-2018-UL-NanoAODv9", "2025-04-11", "met.json.gz"),
+    ("JME", "Run2-2016postVFP-UL-NanoAODv9", "2026-06-10", "jet_jerc.json.gz"),
+    ("JME", "Run2-2016postVFP-UL-NanoAODv9", "2026-06-10", "jetvetomaps.json.gz"),
+    ("JME", "Run2-2016postVFP-UL-NanoAODv9", "2026-06-10", "jmar.json.gz"),
+    ("JME", "Run2-2016postVFP-UL-NanoAODv9", "2026-06-10", "met.json.gz"),
+    ("JME", "Run2-2016preVFP-UL-NanoAODv9", "2026-06-10", "jet_jerc.json.gz"),
+    ("JME", "Run2-2016preVFP-UL-NanoAODv9", "2026-06-10", "jetvetomaps.json.gz"),
+    ("JME", "Run2-2016preVFP-UL-NanoAODv9", "2026-06-10", "jmar.json.gz"),
+    ("JME", "Run2-2016preVFP-UL-NanoAODv9", "2026-06-10", "met.json.gz"),
+    ("JME", "Run2-2017-UL-NanoAODv9", "2026-06-10", "jet_jerc.json.gz"),
+    ("JME", "Run2-2017-UL-NanoAODv9", "2026-06-10", "jetvetomaps.json.gz"),
+    ("JME", "Run2-2017-UL-NanoAODv9", "2026-06-10", "jmar.json.gz"),
+    ("JME", "Run2-2017-UL-NanoAODv9", "2026-06-10", "met.json.gz"),
+    ("JME", "Run2-2018-UL-NanoAODv9", "2026-06-10", "jet_jerc.json.gz"),
+    ("JME", "Run2-2018-UL-NanoAODv9", "2026-06-10", "jetvetomaps.json.gz"),
+    ("JME", "Run2-2018-UL-NanoAODv9", "2026-06-10", "jmar.json.gz"),
+    ("JME", "Run2-2018-UL-NanoAODv9", "2026-06-10", "met.json.gz"),
 
     ("EGM", "Run2-2016postVFP-UL-NanoAODv9", "2024-07-02", "electron.json.gz"),
     ("EGM", "Run2-2016postVFP-UL-NanoAODv9", "2024-07-02", "photon.json.gz"),
@@ -156,8 +158,8 @@ _runII_v9_pogs_tags_pogtags_csets = (
     ("MUO", "Run2-2018-UL-NanoAODv9", "2024-07-02", "muon_JPsi.json.gz"),
     ("MUO", "Run2-2018-UL-NanoAODv9", "2024-07-02", "muon_Z.json.gz"),
 
-    ("TAU", "Run2-2016postVFP-UL-NanoAODv9", "2026-03-25", "tau.json.gz"),
-    ("TAU", "Run2-2016preVFP-UL-NanoAODv9", "2026-03-25", "tau.json.gz"),
+    ("TAU", "Run2-2016postVFP-UL-NanoAODv9", "2026-09-15", "tau.json.gz"),
+    ("TAU", "Run2-2016preVFP-UL-NanoAODv9", "2026-09-15", "tau.json.gz"),
     ("TAU", "Run2-2017-UL-NanoAODv9", "2026-03-25", "tau.json.gz"),
     ("TAU", "Run2-2018-UL-NanoAODv9", "2026-03-25", "tau.json.gz"),
 )
@@ -198,9 +200,8 @@ class CorrectionlibHandler:
         self._analysis = analysis
         self._ver = nanoAODversion
         self._head = Path(cvmfs_head)
-        if not self._head.exists():
-            # local fallback for testing only
-            self._head = Path("/Users/nmangane/Downloads/cvmfs")
+        if not self._head.exists() and os.environ.get("QAWA_CVMFS_HEAD"):
+            self._head = Path(os.environ["QAWA_CVMFS_HEAD"])
         if not self._head.exists():
             raise ValueError(f"{str(self._head)} is not a valid cvmfs head directory for fetching CAT POG corrections")
         self._poghead = self._head / "cms-griddata.cern.ch/cat/metadata/"
@@ -253,15 +254,6 @@ class CorrectionlibHandler:
                 continue
             if self._subera is not None and self._subera not in tag:
                 continue
-            if f"NanoAOD{self._ver}" not in tag:
-                if pog == "LUM" and self._era in ["2016", "2017", "2018"]:
-                    # exception for no PU reweighting for v15 Run2
-                    pass
-                if pog == "MUO" and self._era in ["2016", "2017", "2018"]:
-                    # exception for no PU reweighting for v15 Run2
-                    pass
-                else:
-                    continue
             path = self._poghead / pog / tag / pogtag / cset
             if path.exists():
                 key = cset.split(".")[0] if "." in cset else cset # strip filetype/compression
@@ -275,14 +267,21 @@ class CorrectionlibHandler:
     def _loadCentralExceptions(self):
         # Because there's always a special little exception to add misery to our lives
         if "jer_smear" not in self._paths:
-            self._paths["jer_smear"] = self._poghead / "JME" / "JER-Smearing" / "2025-11-03" / "jer_smear.json.gz"
+            self._paths["jer_smear"] = self._poghead / "JME" / "JER-Smearing" / "2026-09-18" / "jer_smear.json.gz"
 
     def _loadUserPaths(self, analysis: str):
         # Where to load HLT, DDDY, etc corrections...
+        self._paths["electron_smear_random"] = _QAWA_DATA / "egm" / "electron_smear_random.json"
+        self._paths["muon_smear_random"] = _QAWA_DATA / "muo" / "muon_smear_random.json"
         if analysis == "inc-WZ":
+            run2_dddy = _QAWA_DATA / "dd" / "Run2" / ("WZ_inclusive_data_driven_Run2_v15.json" if self._ver == "v15" else "WZ_inclusive_data_driven_Run2.json")
             match self._era:
                 case "2024":
                     # PLACEHOLDER - once Run 3 dddy (2024 only to start with) is derived, replace with Run3/...Run3.json
+                    self._paths["dddy"] = _QAWA_DATA / "dd" / "Run3" / "WZ_inclusive_data_driven_Run3.json"
+                    self._paths["trigger_sf"] = _QAWA_DATA / "trigger_sf" / "triggerSF_2024.json"
+                case "2025":
+                    # PLACEHOLDER - the 2024 data-driven estimate and trigger SFs stand in for 2025
                     self._paths["dddy"] = _QAWA_DATA / "dd" / "Run3" / "WZ_inclusive_data_driven_Run3.json"
                     self._paths["trigger_sf"] = _QAWA_DATA / "trigger_sf" / "triggerSF_2024.json"
                 # Correctionlib conversions of the legacy ROOT trigger SFs
@@ -293,13 +292,13 @@ class CorrectionlibHandler:
                 # legacy lookup. Uncomment a case to route that era through the
                 # correctionlib path in wztau2lnu_inclusive._add_trigger_sf.
                 case "2016":
-                    self._paths["dddy"] = _QAWA_DATA / "dd" / "Run2" / "WZ_inclusive_data_driven_Run2.json"
+                    self._paths["dddy"] = run2_dddy
                 #     self._paths["trigger_sf"] = Path("src/qawa/data/trigger_sf/triggerSF_2016.json")
                 case "2017":
-                    self._paths["dddy"] = _QAWA_DATA / "dd" / "Run2" / "WZ_inclusive_data_driven_Run2.json"
+                    self._paths["dddy"] = run2_dddy
                 #     self._paths["trigger_sf"] = Path("src/qawa/data/trigger_sf/triggerSF_2017.json")
                 case "2018":
-                    self._paths["dddy"] = _QAWA_DATA / "dd" / "Run2" / "WZ_inclusive_data_driven_Run2.json"
+                    self._paths["dddy"] = run2_dddy
                 #     self._paths["trigger_sf"] = Path("src/qawa/data/trigger_sf/triggerSF_2018.json")
                 case _:
                     pass

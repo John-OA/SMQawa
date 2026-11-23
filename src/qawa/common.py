@@ -154,7 +154,7 @@ def met_phi_xy_correction(met, run, npv, is_mc:bool=False, era:str='2016', jet_t
     met['phi'] = phi_
     return met
 
-def trigger_rules(event, rules:dict, era:str='2018'):
+def trigger_rules(event, rules:dict, era:str='2018', isMC: bool = False):
     ds_names_ = {
         '2016' : ['DoubleMuon', 'SingleMuon', 'DoubleEG', 'SingleElectron', 'MuonEG'],
         '2017' : ['DoubleMuon', 'SingleMuon', 'DoubleEG', 'SingleElectron', 'MuonEG'],
@@ -166,25 +166,30 @@ def trigger_rules(event, rules:dict, era:str='2018'):
     
     _pass = np.zeros(len(event), dtype='bool')
     _veto = np.zeros(len(event), dtype='bool')
-    
-    _ds = event.metadata['dataset']
-    ds_name = ''
-    for s in ds_names_[era]:
-        if s in _ds:
-            ds_name = s
-            break
-        
-    for t in rules[f'Run{era}.{ds_name}']['pass']:
+
+    if isMC:
+        ds_name = 'MC'
+    else:
+        stream = re.split('[_/]', event.metadata['dataset'])[0].rstrip('0123456789')
+        ds_name = stream if stream in ds_names_[era] else ''
+
+    key = f'Run{era}.{ds_name}'
+    if key not in rules:
+        raise KeyError(
+            f"No trigger rules for '{key}' "
+            f"(era={era}, isMC={isMC}, dataset={event.metadata.get('dataset')})"
+        )
+
+    for t in rules[key]['pass']:
         if t in event.HLT.fields:
             _pass = _pass | event.HLT[t]
         else:
             print(f'{t} not present in the data')
-            
-    for t in rules[f'Run{era}.{ds_name}']['veto']:
+
+    for t in rules[key]['veto']:
         if t in event.HLT.fields:
-            _veto =  _veto | event.HLT[t]
-            
-    # passing triggers and vetoing triggers from other datasets
+            _veto = _veto | event.HLT[t]
+
     return _pass & ~_veto
 
 # def theory_pdf_weight(weights, pdf_weight):
@@ -339,7 +344,10 @@ class pileup_weights:
                 self.corrections['puWeight' if 'Nom' in var else f'puWeight{var}'] = pileup_corr
     
     
-    def append_pileup_weight(self, weights, pu):
+    def append_pileup_weight(self, weights, pu, variations=True):
+        if not variations:
+            weights.add('pileup_weight', self.clib.evaluate(pu, 'nominal') if self.clib else self.corrections['puWeight'](pu))
+            return weights
         weights.add(
             'pileup_weight',
             self.clib.evaluate(pu, 'nominal') if self.clib else self.corrections['puWeight'    ](pu),
@@ -452,7 +460,8 @@ class ewk_corrector:
                 "x":  ak.zeros_like(x1), 
                 "y":  ak.zeros_like(x1),
                 "z":  x1 * self.energy,
-                "t":  x1 * self.energy
+                "t":  x1 * self.energy,
+                "charge": ak.zeros_like(x1)
             },
             with_name="Candidate",
             behavior=candidate.behavior
@@ -463,7 +472,8 @@ class ewk_corrector:
                 "x":  ak.zeros_like(x2), 
                 "y":  ak.zeros_like(x2),
                 "z": -x2 * self.energy,
-                "t":  x2 * self.energy
+                "t":  x2 * self.energy,
+                "charge": ak.zeros_like(x2),
             },
             with_name="Candidate",
             behavior=candidate.behavior,

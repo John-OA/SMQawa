@@ -5,7 +5,11 @@ if [[ "$1" == "zsh" ]]; then
 #!/usr/bin/env zsh
 autoload bashcompinit
 bashcompinit
-source SMQawa/call_host.zsh
+if [ ! -d "lpc-scripts" ]; then
+  git clone https://github.com/FNALLPC/lpc-scripts.git
+fi
+https://github.com/FNALLPC/lpc-scripts.git
+source lpc-scripts/call_host.sh
 
 export INSTALL_LOC_EXTERNAL=\$PWD
 export INSTALL_LOC=/srv/
@@ -15,7 +19,10 @@ EOF
 else
     cat <<EOF > shell
 #!/usr/bin/env bash
-source SMQawa/call_host.sh
+if [ ! -d "lpc-scripts" ]; then
+  git clone https://github.com/FNALLPC/lpc-scripts.git
+fi
+source lpc-scripts/call_host.sh
 
 export INSTALL_LOC_EXTERNAL=\$PWD
 export INSTALL_LOC=/srv/
@@ -72,7 +79,7 @@ if [ ! -d "SMQawa" ]; then
   echo "clean the virtual env before re-attempting install."
 fi
 # Source the call_host script again inside the container
-source SMQawa/call_host.zsh
+source lpc-scripts/call_host.sh
 
 # To get dasgoclient
 export PATH=\$PATH:/cvmfs/cms.cern.ch/common
@@ -104,13 +111,14 @@ install_env() {
   source \$INSTALL_LOC.env/bin/activate
   unlink \$INSTALL_LOC.env/lib64  # HTCondor can't transfer symlink to directory and it appears optional
   cd \${INSTALL_LOC}
-  # if [ ! -d "coffea" ]; then
-  #   echo "Cloning coffea for editable install"
-  #   git clone -b smqawa-wz2ltaunu http://github.com/NJManganelli/coffea.git
-  # fi
-  # cd coffea
-  # \$INSTALL_LOC.env/bin/python -m pip install -e .
-  # cd ..
+  if [ ! -d "coffea" ]; then
+    echo "Cloning coffea for editable install"
+    git clone https://github.com/scikit-hep/coffea.git
+    git -C coffea checkout 4abe6016fac857469e80ae249307ebee4674efe0
+  fi
+  cd coffea
+  \$INSTALL_LOC.env/bin/python -m pip install --no-deps -e .
+  cd ..
   cd SMQawa
   \$INSTALL_LOC.env/bin/python -m pip install -e .
   cd ..
@@ -161,7 +169,7 @@ if [ ! -d "SMQawa" ]; then
   echo "clean the virtual env before re-attempting install."
 fi
 # Source the call_host script again inside the container
-source SMQawa/call_host.sh
+source lpc-scripts/call_host.sh
 
 # To get dasgoclient
 export PATH=\$PATH:/cvmfs/cms.cern.ch/common
@@ -190,13 +198,14 @@ install_env() {
   source \$INSTALL_LOC.env/bin/activate
   unlink \$INSTALL_LOC.env/lib64  # HTCondor can't transfer symlink to directory and it appears optional
   cd \${INSTALL_LOC}
-  # if [ ! -d "coffea" ]; then
-  #   echo "Cloning coffea for editable install"
-  #   git clone -b smqawa-wz2ltaunu http://github.com/NJManganelli/coffea.git
-  # fi
-  # cd coffea
-  # \$INSTALL_LOC.env/bin/python -m pip install -e .
-  # cd ..
+  if [ ! -d "coffea" ]; then
+    echo "Cloning coffea for editable install"
+    git clone https://github.com/scikit-hep/coffea.git
+    git -C coffea checkout 4abe6016fac857469e80ae249307ebee4674efe0
+  fi
+  cd coffea
+  \$INSTALL_LOC.env/bin/python -m pip install --no-deps -e .
+  cd ..
   cd SMQawa
   \$INSTALL_LOC.env/bin/python -m pip install -e .
   cd ..

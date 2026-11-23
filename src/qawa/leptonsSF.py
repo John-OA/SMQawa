@@ -1,5 +1,6 @@
 import os.path
 from coffea.lookup_tools import extractor, dense_lookup
+from coffea.util import coffea_console
 import awkward as ak
 import numpy as np
 import uproot 
@@ -41,7 +42,7 @@ class LeptonScaleFactors:
         self.cset_e_key = None
         self.sig0_year = None
         match self._erasubera:
-            case "2024":
+            case "2024" | "2025":
                 # MUON
                 if not hasattr(self, "muonIDxISOAvailable"):
                     self.mask_m_pt = 10.0
@@ -69,7 +70,7 @@ class LeptonScaleFactors:
                     self.electronIDAvailable = ["Veto", "Loose", "Medium", "Tight", "wp80iso", "wp90iso", "wp80noiso", "wp90noiso", "PromptMVA-Medium",  "PromptMVA-Tight"]
                     assert self.electronID in self.electronIDAvailable, f"Available electron IDs: {self.electronIDAvailable}"
                 self.cset_e_key = "Electron-ID-SF"
-                self.sig0_year = "2024Prompt"
+                self.sig0_year = f"{self._erasubera}Prompt"
                 self.reco_e_high = "RecoAbove75"
                 self.reco_e_mid = "Reco20to75"
                 self.reco_e_low = "RecoBelow20"
@@ -107,218 +108,27 @@ class LeptonScaleFactors:
                 self.reco_e_low = "RecoBelow20"
             case _:
                 raise NotImplementedError(f"Unmatched era + subera in LeptonSF implementation: {self._erasubera}")
-        
+        self.reco_e_low_pt = None
+        try:
+            self.clib_electrons[self.cset_e_key].evaluate(self.sig0_year, "sf", self.reco_e_low, 0.5, 15.0)
+        except IndexError:
+            self.reco_e_low_pt = float(np.nextafter(20.0, np.inf))
+            coffea_console.print(f"[yellow]No {self.reco_e_low} electron reco SF for {self.sig0_year}: electrons below 20 GeV "
+                                 f"take the {self.reco_e_mid} SF evaluated at pt = {self.reco_e_low_pt!r} GeV[/yellow]")
+            self.reco_e_low = self.reco_e_mid
+
     def __init_legacy__(self, era:str='2018', isAPV:bool=False, isEE:bool=False, isBPix:bool=False):
-        self._erasubera = era
-        if isAPV:
-            self._era = era + 'APV'
-        else:
-            self._era = era 
-        if isAPV:
-            self._erasubera += "_APV"
-        elif isEE:
-            self._erasubera += "_EE"
-        elif isBPix:
-            self._erasubera += "_BPix"
-        self._erasuberanousc = self._erasubera.replace("_", "")
-        extLepSF = extractor()
+        raise NotImplementedError("Legacy path deprecated due to evolution in clib")
 
-        _data_path = os.path.join(os.path.dirname(__file__), 'data/LeptonSF')
-
-        muonSelectionTag     = "TightWP_" + self._erasuberanousc
-        electronSelectionTag = "GPMVA90_" + self._erasuberanousc
-
-        if muonSelectionTag=="TightWP_2016":
-            mu_f=["2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_ID.root",
-                  "2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_ISO.root"]
-            mu_h = ["NUM_TightID_DEN_TrackerMuons_abseta_pt",
-                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt"]
-            mu_f_up = ["2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_ID_variations.root",
-                  "2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_ISO_variations.root"]
-            mu_h_up = ['NUM_LooseID_DEN_TrackerMuons_abseta_pt_up;1',
-                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt_up;1"]
-            mu_f_down = ["2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_ID_variations.root",
-                  "2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_ISO_variations.root"]
-            mu_h_down = ["NUM_LooseID_DEN_TrackerMuons_abseta_pt_down;1",
-                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt_down"]
-            
-        elif muonSelectionTag=="TightWP_2016APV":
-            mu_f=["2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_HIPM_ID.root",
-                  "2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_HIPM_ISO.root"]
-            mu_h = ["NUM_TightID_DEN_TrackerMuons_abseta_pt",
-                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt"]
-            mu_f_up = ["2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_HIPM_ID_variations.root",
-                  "2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_HIPM_ISO_variations.root"]
-            mu_h_up = ['NUM_LooseID_DEN_TrackerMuons_abseta_pt_up;1',
-                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt_up;1"]
-            mu_f_down = ["2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_HIPM_ID_variations.root",
-                  "2016/Efficiencies_muon_generalTracks_Z_Run2016_UL_HIPM_ISO_variations.root"]
-            mu_h_down = ["NUM_LooseID_DEN_TrackerMuons_abseta_pt_down;1",
-                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt_down"]
-        elif muonSelectionTag=="TightWP_2017":
-            mu_f=["2017/Efficiencies_muon_generalTracks_Z_Run2017_UL_ID.root",
-                  "2017/Efficiencies_muon_generalTracks_Z_Run2017_UL_ISO.root"]
-            mu_h = ["NUM_TightID_DEN_TrackerMuons_abseta_pt",
-                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt"]
-            mu_f_up = ["2017/Efficiencies_muon_generalTracks_Z_Run2017_UL_ID_variations.root",
-                  "2017/Efficiencies_muon_generalTracks_Z_Run2017_UL_ISO_variations.root"]
-            mu_h_up = ['NUM_LooseID_DEN_TrackerMuons_abseta_pt_up;1',
-                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt_up;1"]
-            mu_f_down = ["2017/Efficiencies_muon_generalTracks_Z_Run2017_UL_ID_variations.root",
-                  "2017/Efficiencies_muon_generalTracks_Z_Run2017_UL_ISO_variations.root"]
-            mu_h_down = ["NUM_LooseID_DEN_TrackerMuons_abseta_pt_down;1",
-                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt_down"]
-        elif muonSelectionTag=="TightWP_2018":
-            mu_f=["2018/Efficiencies_muon_generalTracks_Z_Run2018_UL_ID.root",
-                  "2018/Efficiencies_muon_generalTracks_Z_Run2018_UL_ISO.root"]
-            mu_h = ["NUM_TightID_DEN_TrackerMuons_abseta_pt",
-                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt"]
-            mu_f_up = ["2018/Efficiencies_muon_generalTracks_Z_Run2018_UL_ID_variations.root",
-                  "2018/Efficiencies_muon_generalTracks_Z_Run2018_UL_ISO_variations.root"]
-            mu_h_up = ['NUM_LooseID_DEN_TrackerMuons_abseta_pt_up;1',
-                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt_up;1"]
-            mu_f_down = ["2018/Efficiencies_muon_generalTracks_Z_Run2018_UL_ID_variations.root",
-                  "2018/Efficiencies_muon_generalTracks_Z_Run2018_UL_ISO_variations.root"]
-            mu_h_down = ["NUM_LooseID_DEN_TrackerMuons_abseta_pt_down;1",
-                    "NUM_TightRelIso_DEN_TightIDandIPCut_abseta_pt_down"]
-        else:
-            print (f'wrong era: {muonSelectionTag}')
-
-
-        if electronSelectionTag=="GPMVA90_2016":
-            el_f = ["2016/egammaEffi.txt_Ele_wp90iso_postVFP_EGM2D.root",
-                    "2016/electron_RecoSF_UL2016postVFP.root"]
-            el_h = ["EGamma_SF2D","EGamma_SF2D"]
-            el_f_up = ["2016/egammaEffi.txt_Ele_wp90iso_postVFP_EGM2D_variations.root",
-                    "2016/electron_RecoSF_UL2016postVFP.root"]
-            el_h_up = ["EGamma_SF2D_up","EGamma_SF2D"]
-            el_f_down = ["2016/egammaEffi.txt_Ele_wp90iso_postVFP_EGM2D_variations.root",
-                    "2016/electron_RecoSF_UL2016postVFP.root"]
-            el_h_down = ["EGamma_SF2D_down","EGamma_SF2D"]
-        elif electronSelectionTag=="GPMVA90_2016APV":
-            el_f = ["2016/egammaEffi.txt_Ele_wp90iso_preVFP_EGM2D.root",
-                    "2016/electron_RecoSF_UL2016preVFP.root"]
-            el_h = ["EGamma_SF2D","EGamma_SF2D"]
-            el_f_up = ["2016/egammaEffi.txt_Ele_wp90iso_preVFP_EGM2D_variations.root",
-                    "2016/electron_RecoSF_UL2016preVFP.root"]
-            el_h_up = ["EGamma_SF2D_up","EGamma_SF2D"]
-            el_f_down = ["2016/egammaEffi.txt_Ele_wp90iso_preVFP_EGM2D_variations.root",
-                    "2016/electron_RecoSF_UL2016preVFP.root"]
-            el_h_down = ["EGamma_SF2D_down","EGamma_SF2D"]
-        elif electronSelectionTag=="GPMVA90_2017":
-            el_f = ["2017/egammaEffi.txt_EGM2D_MVA90iso_UL17.root",
-                    "2017/electron_RecoSF_UL2017.root"]
-            el_h = ["EGamma_SF2D","EGamma_SF2D"]
-            el_f_up = ["2017/egammaEffi.txt_EGM2D_MVA90iso_UL17_variations.root",
-                    "2017/electron_RecoSF_UL2017.root"]
-            el_h_up = ["EGamma_SF2D_up","EGamma_SF2D"]
-            el_f_down = ["2017/egammaEffi.txt_EGM2D_MVA90iso_UL17_variations.root",
-                    "2017/electron_RecoSF_UL2017.root"]
-            el_h_down = ["EGamma_SF2D_down","EGamma_SF2D"]
-        elif electronSelectionTag=="GPMVA90_2018":
-            el_f = ["2018/egammaEffi.txt_Ele_wp90iso_EGM2D.root",
-                    "2018/electron_RecoSF_UL2018.root"]
-            el_h = ["EGamma_SF2D","EGamma_SF2D"]
-            el_f_up = ["2018/egammaEffi.txt_Ele_wp90iso_EGM2D_variations.root",
-                    "2018/electron_RecoSF_UL2018.root"]
-            el_h_up = ["EGamma_SF2D_up","EGamma_SF2D"]
-            el_f_down = ["2018/egammaEffi.txt_Ele_wp90iso_EGM2D_variations.root",
-                    "2018/electron_RecoSF_UL2018.root"]
-            el_h_down = ["EGamma_SF2D_down","EGamma_SF2D"]
-        else:
-            print (f'wrong era: {electronSelectionTag}')
-            
-        self.maps_nom = {}
-        self.maps_up = {}
-        self.maps_down = {}
-        for i, _fname in enumerate(mu_f):
-            with uproot.open(f"{_data_path}/{_fname}") as _fn:
-                _hist = _fn[mu_h[i]].to_hist()
-                _hnom = _hist.values()
-                tag = f"MuonIso{era}" if "ISO" in _fname else ""
-                tag = f"MuonId{era}"  if "ID" in _fname else tag
-                self.maps_nom[tag] = dense_lookup.dense_lookup(_hnom,[ax.edges for ax in _hist.axes])
-            with uproot.open(f"{_data_path}/{mu_f_up[i]}") as _fn:
-                _hist = _fn[mu_h_up[i]].to_hist()
-                _herr_up = _hist.values()
-                tag = f"MuonIso{era}" if "ISO" in _fname else ""
-                tag = f"MuonId{era}"  if "ID" in _fname else tag
-                self.maps_up[tag] = dense_lookup.dense_lookup(_herr_up,[ax.edges for ax in _hist.axes])
-            with uproot.open(f"{_data_path}/{mu_f_down[i]}") as _fn:
-                _hist = _fn[mu_h_down[i]].to_hist()
-                _herr_down = _hist.values()
-                tag = f"MuonIso{era}" if "ISO" in _fname else ""
-                tag = f"MuonId{era}"  if "ID" in _fname else tag
-                self.maps_down[tag] = dense_lookup.dense_lookup(_herr_down,[ax.edges for ax in _hist.axes])
-                
-        for i, _fname in enumerate(el_f):
-            with uproot.open(f"{_data_path}/{_fname}") as _fn:
-                _hist = _fn[el_h[i]].to_hist()
-                _hnom = _hist.values()
-                tag = f"ElectronIso{era}" if "iso" in _fname else ""
-                tag = f"ElectronReco{era}" if "Reco" in _fname else tag
-                self.maps_nom[tag] = dense_lookup.dense_lookup(_hnom,[ax.edges for ax in _hist.axes])
-            with uproot.open(f"{_data_path}/{el_f_up[i]}") as _fn:
-                _hist = _fn[el_h_up[i]].to_hist()
-                _herr_up = _hist.values()
-                tag = f"ElectronIso{era}" if "iso" in _fname else ""
-                tag = f"ElectronReco{era}" if "Reco" in _fname else tag
-                self.maps_up[tag] = dense_lookup.dense_lookup(_herr_up,[ax.edges for ax in _hist.axes])
-            with uproot.open(f"{_data_path}/{el_f_down[i]}") as _fn:
-                _hist = _fn[el_h_down[i]].to_hist()
-                _herr_down = _hist.values()
-                tag = f"ElectronIso{era}" if "iso" in _fname else ""
-                tag = f"ElectronReco{era}" if "Reco" in _fname else tag
-                self.maps_down[tag] = dense_lookup.dense_lookup(_herr_down,[ax.edges for ax in _hist.axes])
-
-    def muonSF(self, muons: ak.Array):
+    def muonSF(self, muons: ak.Array, variations=True):
         if self.clib_muons:
-            return self.muonSF_clib(muons)
+            return self.muonSF_clib(muons, variations=variations)
         else:
-            # Hardcoded TightID and
-            assert self.muonID == "Tight", "Legacy muonSF method is hardcoded for TightID [ID]"
-            assert self.muonISO == "TightRelIso", "Legacy muonSF method is hardcoded for Tight RelIso [ISO]"
-            return self.muonSF_legacy(muons)
+            raise NotImplementedError("Legacy path deprecated due to evolution in clib")
 
-    def muonSF_legacy(self, muons: ak.Array):
-        # sf_nom  = 1.0 # ak.ones_like(muons.pt)
-        # sf_up   = 1.0 # ak.ones_like(muons.pt)
-        # sf_down = 1.0 # ak.ones_like(muons.pt)
-
-        id_sfs = {}
-        iso_sfs = {}
-        for n in self.maps_nom.keys():
-            if 'Muon' not in n: continue
-            _nom = self.maps_nom[n](muons.pt, np.abs(muons.eta))
-            _up = self.maps_up[n](muons.pt, np.abs(muons.eta))
-            _down = self.maps_down[n](muons.pt, np.abs(muons.eta))
-            if "Id" in n:
-                id_sfs["nominal"] = _nom
-                id_sfs["up"] = _up
-                id_sfs["down"] = _down
-            else:
-                iso_sfs["nominal"] = _nom
-                iso_sfs["up"] = _up
-                iso_sfs["down"] = _down
-            # sf_nom = sf_nom * _nom 
-            # sf_up = sf_up * _up
-            # sf_down = sf_down * _down
-            
-        # return sf_nom, sf_up, sf_down
-        _ones = ak.ones_like(muons.pt)
-        return {"nominal":        id_sfs["nominal"] * iso_sfs["nominal"],
-                "eff_m_idUp":     id_sfs["up"]      * iso_sfs["nominal"],
-                "eff_m_idDown":   id_sfs["down"]    * iso_sfs["nominal"],
-                "eff_m_isoUp":    id_sfs["nominal"] * iso_sfs["up"],
-                "eff_m_isoDown":  id_sfs["nominal"] * iso_sfs["down"],
-                "eff_e_recoUp":   _ones,
-                "eff_e_recoDown": _ones,
-                "eff_e_idUp":     _ones,
-                "eff_e_idDown":   _ones,
-                }
-
-    def muonSF_clib(self, muons: ak.Array):
+    def muonSF_clib(self, muons: ak.Array, variations=True):
         maskEtaPt = (np.abs(muons.eta) <= 2.4) & (muons.pt >= self.mask_m_pt)
+        systs = {"nominal": "nominal", "up": "systup", "down": "systdown"} if variations else {"nominal": "nominal"}
         # Alternative systematics are additive (i.e. must be added to nominal to bound it): "AltBkg", "AltSig","massBin","massRange","stat","syst","tagIso"
         id_sfs = {sig2_name: ak.where(maskEtaPt, 
                                       # correction
@@ -327,7 +137,7 @@ class LeptonScaleFactors:
                                                                                     sig2_syst
                                                                                     ),
                                       ak.ones_like(muons.pt)
-                                      ) for sig2_name, sig2_syst in {"nominal": "nominal", "up": "systup", "down": "systdown"}.items()
+                                      ) for sig2_name, sig2_syst in systs.items()
                   }
         id_sfs = {k: ak.fill_none(v, 1.0, axis=1) for k, v in id_sfs.items()}
         iso_sfs = {sig2_name: ak.where(maskEtaPt, 
@@ -337,69 +147,39 @@ class LeptonScaleFactors:
                                                                                      sig2_syst
                                                                                      ),
                                        ak.ones_like(muons.pt)
-                                       ) for sig2_name, sig2_syst in {"nominal": "nominal", "up": "systup", "down": "systdown"}.items()
+                                       ) for sig2_name, sig2_syst in systs.items()
                   }
         iso_sfs = {k: ak.fill_none(v, 1.0, axis=1) for k, v in iso_sfs.items()}
         _ones = ak.ones_like(muons.pt)
-        return {"nominal":        id_sfs["nominal"] * iso_sfs["nominal"],
-                "eff_m_idUp":     id_sfs["up"]      * iso_sfs["nominal"],
-                "eff_m_idDown":   id_sfs["down"]    * iso_sfs["nominal"],
-                "eff_m_isoUp":    id_sfs["nominal"] * iso_sfs["up"],
-                "eff_m_isoDown":  id_sfs["nominal"] * iso_sfs["down"],
-                "eff_e_recoUp":   _ones,
-                "eff_e_recoDown": _ones,
-                "eff_e_idUp":     _ones,
-                "eff_e_idDown":   _ones,
-                }
+        if not variations:
+            return {
+                "eff_m_idNominal":   id_sfs["nominal"],
+                "eff_m_isoNominal":  iso_sfs["nominal"],
+                "eff_e_recoNominal": _ones,
+                "eff_e_idNominal":   _ones,
+            }
+        return {
+            "eff_m_idNominal":   id_sfs["nominal"],
+            "eff_m_idUp":        id_sfs["up"],
+            "eff_m_idDown":      id_sfs["down"],
+            "eff_m_isoNominal":  iso_sfs["nominal"],
+            "eff_m_isoUp":       iso_sfs["up"],
+            "eff_m_isoDown":     iso_sfs["down"],
+            "eff_e_recoNominal": _ones,
+            "eff_e_recoUp":      _ones,
+            "eff_e_recoDown":    _ones,
+            "eff_e_idNominal":   _ones,
+            "eff_e_idUp":        _ones,
+            "eff_e_idDown":      _ones,
+        }
 
-    def electronSF(self, electrons: ak.Array):
+    def electronSF(self, electrons: ak.Array, variations=True):
         if self.clib_electrons:
-            return self.electronSF_clib(electrons)
+            return self.electronSF_clib(electrons, variations=variations)
         else:
-            assert self.electronID == "wp90iso", "Legacy electronSF method is hardcoded for wp90iso [ID+ISO]"
-            return self.electronSF_legacy(electrons)
+            raise NotImplementedError("Legacy path deprecated due to evolution in clib")
 
-    def electronSF_legacy(self, electrons: ak.Array):
-        # sf_nom  = 1.0 # ak.ones_like(muons.pt)
-        # sf_up   = 1.0 # ak.ones_like(muons.pt)
-        # sf_down = 1.0 # ak.ones_like(muons.pt)
-
-        reco_sfs = {}
-        id_sfs = {}
-        for n in self.maps_nom.keys():
-            if 'Electron' not in n: continue
-            _nom = self.maps_nom[n](electrons.pt, np.abs(electrons.eta))
-            _up = self.maps_up[n](electrons.pt, np.abs(electrons.eta))
-            _down = self.maps_down[n](electrons.pt, np.abs(electrons.eta))
-            if "Reco" in n:
-                assert "nominal" not in reco_sfs.keys()
-                reco_sfs["nominal"] = _nom
-                reco_sfs["up"] = _up
-                reco_sfs["down"] = _down
-            else:
-                assert "nominal" not in id_sfs.keys()
-                # "Iso" means nothing in electron MVA IDs, it's a combination ID/ISO SF...
-                id_sfs["nominal"] = _nom
-                id_sfs["up"] = _up
-                id_sfs["down"] = _down
-            # sf_nom = sf_nom * _nom 
-            # sf_up = sf_up * _up
-            # sf_down = sf_down * _down
-            
-        # return sf_nom, sf_up, sf_down
-        _ones = ak.ones_like(electrons.pt)
-        return {"nominal":        reco_sfs["nominal"] * id_sfs["nominal"],
-                "eff_m_idUp":     _ones,
-                "eff_m_idDown":   _ones,
-                "eff_m_isoUp":    _ones,
-                "eff_m_isoDown":  _ones,
-                "eff_e_recoUp":   reco_sfs["up"]      * id_sfs["nominal"],
-                "eff_e_recoDown": reco_sfs["down"]    * id_sfs["nominal"],
-                "eff_e_idUp":     reco_sfs["nominal"] * id_sfs["up"],
-                "eff_e_idDown":   reco_sfs["nominal"] * id_sfs["down"],
-                }
-
-    def electronSF_clib(self, electrons: ak.Array):
+    def electronSF_clib(self, electrons: ak.Array, variations=True):
         # 0	{ name: "year", type: "string", description: "year/scenario: example, 2017, 2022FG etc" }
         # 1	{ name: "ValType", type: "string", description: "sf/ sfup / sfdown / effData / effMC / err_stat /err_statData / err_statMC / err_syst (sfup = sf + syst, sfdown = sf - syst) " }
         # 2	{ name: "WorkingPoint", type: "string", description: "Working Point of choice : Loose, Medium etc." }
@@ -415,6 +195,7 @@ class LeptonScaleFactors:
         maskAbove75 = sig4_electrons_pt >= 75.0
         mask20to75 = (sig4_electrons_pt >= 20.0) & (sig4_electrons_pt < 75.0)
         maskBelow20 = (sig4_electrons_pt >= 10.0) & (sig4_electrons_pt < 20.0)
+        systs = {"nominal": "sf", "up": "sfup", "down": "sfdown"} if variations else {"nominal": "sf"}
         reco_sfs = {sig1_name: ak.where(maskAbove75,
                                         # correction RecoAbove75
                                         self.clib_electrons[self.cset_e_key].evaluate(self.sig0_year,
@@ -437,13 +218,15 @@ class LeptonScaleFactors:
                                                                                                         sig1_syst,
                                                                                                         self.reco_e_low,
                                                                                                         sig3_electrons_sceta,
-                                                                                                        ak.mask(sig4_electrons_pt, maskBelow20, valid_when=True)
+                                                                                                        ak.mask(sig4_electrons_pt if self.reco_e_low_pt is None
+                                                                                                                else ak.full_like(sig4_electrons_pt, self.reco_e_low_pt),
+                                                                                                                maskBelow20, valid_when=True)
                                                                                                         ),
                                                           # fallback: 1.0
                                                           ak.ones_like(sig4_electrons_pt)
                                                           )
                                                  )
-                                        ) for sig1_name, sig1_syst in {"nominal": "sf", "up": "sfup", "down": "sfdown"}.items()
+                                        ) for sig1_name, sig1_syst in systs.items()
                     }
         reco_sfs = {k: ak.fill_none(v, 1.0, axis=1) for k, v in reco_sfs.items()}
         maskAbove10 = sig4_electrons_pt >= 10.0
@@ -457,29 +240,40 @@ class LeptonScaleFactors:
                                                                                     ),
                                       # fallback: 1.0
                                       ak.ones_like(sig4_electrons_pt)
-                                      ) for sig1_name, sig1_syst in {"nominal": "sf", "up": "sfup", "down": "sfdown"}.items()
+                                      ) for sig1_name, sig1_syst in systs.items()
                   }
         id_sfs = {k: ak.fill_none(v, 1.0, axis=1) for k, v in id_sfs.items()}
         _ones = ak.ones_like(electrons.pt)
-        return {"nominal":        reco_sfs["nominal"] * id_sfs["nominal"],
-                "eff_m_idUp":     _ones,
-                "eff_m_idDown":   _ones,
-                "eff_m_isoUp":    _ones,
-                "eff_m_isoDown":  _ones,
-                "eff_e_recoUp":   reco_sfs["up"]      * id_sfs["nominal"],
-                "eff_e_recoDown": reco_sfs["down"]    * id_sfs["nominal"],
-                "eff_e_idUp":     reco_sfs["nominal"] * id_sfs["up"],
-                "eff_e_idDown":   reco_sfs["nominal"] * id_sfs["down"],
-                }
+        if not variations:
+            return {
+                "eff_m_idNominal":   _ones,
+                "eff_m_isoNominal":  _ones,
+                "eff_e_recoNominal": reco_sfs["nominal"],
+                "eff_e_idNominal":   id_sfs["nominal"],
+            }
+        return {
+            "eff_m_idNominal":   _ones,
+            "eff_m_idUp":        _ones,
+            "eff_m_idDown":      _ones,
+            "eff_m_isoNominal":  _ones,
+            "eff_m_isoUp":       _ones,
+            "eff_m_isoDown":     _ones,
+            "eff_e_recoNominal": reco_sfs["nominal"],
+            "eff_e_recoUp":      reco_sfs["up"],
+            "eff_e_recoDown":    reco_sfs["down"],
+            "eff_e_idNominal":   id_sfs["nominal"],
+            "eff_e_idUp":        id_sfs["up"],
+            "eff_e_idDown":      id_sfs["down"],
+        }
 
-    def append_lepton_sf(self, lead_lep, subl_lep, weights):
-        _ones = ak.ones_like(lead_lep.nominal)
-        _nom = lead_lep.nominal*subl_lep.nominal
-        weights.add("Lep_nom", _nom)
+    def append_lepton_sf(self, lead_lep, subl_lep, weights, variations=True):
         for key in ["eff_m_id", "eff_m_iso", "eff_e_reco", "eff_e_id"]:
+            if not variations:
+                weights.add(key, getattr(lead_lep, f"{key}Nominal") * getattr(subl_lep, f"{key}Nominal"))
+                continue
             weights.add(
                 key,
-                _ones, #we don't add the central value more than once
-                getattr(lead_lep, f"{key}Up") * getattr(subl_lep, f"{key}Up")/_nom, #we cancel out the nominal value through the division
-                getattr(lead_lep, f"{key}Down") * getattr(subl_lep, f"{key}Down")/_nom, #we cancel out the nominal value through the division
+                getattr(lead_lep, f"{key}Nominal") * getattr(subl_lep, f"{key}Nominal"),
+                getattr(lead_lep, f"{key}Up") * getattr(subl_lep, f"{key}Up"),
+                getattr(lead_lep, f"{key}Down") * getattr(subl_lep, f"{key}Down"),
             )
