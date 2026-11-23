@@ -232,7 +232,7 @@ def main():
                 #    version=auto_ver,
                 #)
                 is_signal = True if ('WZto3LNu' in options.dataset or 'WZTo3LNu' in options.dataset) else False
-            elif options.analysis in ["inc-PhotonCR"]:
+            elif options.analysis in ["inc-ZZ-test"]:
                 # Photon control region (gamma+jets) development processor; will become the inc-ZZ photon CR
                 from qawa.process.zz2l2nu_inclusive_test import zzinclusive_test_processor
                 coffea_console.print(" --- zz2l2nu_inclusive_test (photon CR) processor ... ")
