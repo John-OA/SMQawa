@@ -43,3 +43,4 @@ MANIFEST
 *.DS_store.DS_Store
 ._.DS_Store
 final_merged_hists/
+**/.DS_Store
