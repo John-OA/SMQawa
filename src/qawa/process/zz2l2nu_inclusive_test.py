@@ -34,6 +34,7 @@ from qawa.gen_match import find_best_match
 from qawa.datadriven import DataDrivenEventReweight
 from qawa.common import pileup_weights, ewk_corrector, met_phi_xy_correction, theory_ps_weight, theory_pdf_weight, trigger_rules, transverse_energy, propagate_shift_to_met
 from qawa.jsoncorrections import CorrectionlibHandler
+from qawa.photons import build_photons, photon_trigger_mask  # photon control region
 from qawa.met_shim import prepare_met_for_factory
 
 from qawa.polarization import (
@@ -1093,6 +1094,9 @@ class zzinclusive_test_processor(processor.ProcessorABC):
         else:
             selection.add('lumimask', np.ones(len(event), dtype='bool'))
             selection.add('triggers', np.ones(len(event), dtype='bool'))
+        # Photon control region: single-photon triggers, used INSTEAD of 'triggers' in the inc-PCR regions.
+        # Applied to MC as well, so data and MC see the same trigger requirement.
+        selection.add('photon_triggers', photon_trigger_mask(event, is_mc=not is_data))
         if self._jetveto is not None:
             selection.add('jetveto', ~ak.any(
                 self._jetveto.evaluate('jetvetomap', event.OrigJet.eta, event.OrigJet.phi), axis=1
@@ -1229,6 +1233,10 @@ class zzinclusive_test_processor(processor.ProcessorABC):
         tight_lep = tight_lep[tight_sorter]
         ntight_lep = ak.num(tight_lep)
         nloose_lep = ak.num(loose_lep)
+
+        # Photon control region: good photons (baseline selection + cleaning against tight leptons)
+        good_photons = build_photons(event.Photon, tight_lep, nanoAODversion=self._ver)
+        ngood_photons = ak.num(good_photons)
 
         had_taus = build_htaus(event.Tau, tight_lep, nanoAODversion=self._ver, tauIDvsj_wp="VTight", tauIDvse_wp=self.tauIDvse_wp, tauIDvsmu_wp=self.tauIDvsmu_wp, tagger=self.htau_tagger)
         had_taus_tight = build_htaus(event.Tau, tight_lep, nanoAODversion=self._ver, tauIDvsj_wp="Tight", tauIDvse_wp=self.tauIDvse_wp, tauIDvsmu_wp=self.tauIDvsmu_wp, tagger=self.htau_tagger)
@@ -1569,6 +1577,10 @@ class zzinclusive_test_processor(processor.ProcessorABC):
         selection.add('0njets' , ngood_jets  == 0 )
         selection.add('1njets' , ngood_jets  <= 1 )
         selection.add('1njets_only' , ngood_jets  == 1 )
+        # photon control region: lepton veto and photon multiplicity
+        selection.add('0lep'   , (ntight_lep == 0) & (nloose_lep == 0) )
+        selection.add('1photon', ngood_photons == 1 )
+        selection.add('2photon', ngood_photons == 2 )
         # selection.add('0nbjets', ngood_bjets == 0 )
         # selection.add('nbjets', ngood_bjets >= 1 )
         selection.add('1nhtaus_vtight', nhtaus_lep_vtight  == 1 )
@@ -1845,9 +1857,18 @@ class zzinclusive_test_processor(processor.ProcessorABC):
 
             "inc-IR1H": common_sel + [
                 'require-ossf', 'require-2lep', 'dilep_m', 'dilep_dphi_met', 'dilep_pt', '1njets_only', '1nhtaus_tight', '~2plusnhtaus_loose', '~1nhtaus_vtight', 'met_pt'
-        ],            
+        ],
 
         }
+        # Photon control region (gamma+jets): photon triggers replace 'triggers'; no MET cut here
+        # (the reweighting split, e.g. 120 GeV in SMP-23-001, comes later as its own constant).
+        photon_common_sel = [s if s != 'triggers' else 'photon_triggers' for s in common_sel]
+        channels.update({
+            "inc-PCR0" : photon_common_sel + ['0lep', '1photon', '0njets'     ],
+            "inc-PCR1" : photon_common_sel + ['0lep', '1photon', '1njets_only'],
+            "inc-PCR01": photon_common_sel + ['0lep', '1photon', '1njets'     ],
+            "inc-PCR2g": photon_common_sel + ['0lep', '2photon'               ],
+        })
 
 
         if self._split_by_charge:

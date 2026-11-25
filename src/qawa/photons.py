@@ -6,6 +6,7 @@ can be tested without loading a full processor. When finished it moves into
 zz2l2nu_inclusive_test.py (next to build_leptons / build_htaus / build_jets) and
 this file is deleted.
 """
+import re
 import warnings
 
 import awkward as ak
@@ -33,6 +34,34 @@ PHOTON_ELECTRON_VETO_CHOICES = ["electronVeto", "pixelSeedVeto"]
 # TODO(colleague / SMP-23-001 author): which photon ID working point, and which electron veto (if any)?
 PHOTON_ID_WP = None
 PHOTON_ELECTRON_VETO = None
+
+# Single-photon HLT paths for the photon control region (OR of all listed paths).
+# Only Photon200 is listed: it is the one single-photon path already in 2024-trigger-rules.yaml.
+# Consequence: in DATA the region is ~empty below photon pT ~200-220 GeV until lower paths are added.
+# TODO(SMP-23-001 author / TSG): Run 3 (2024) single-photon path names below 200 GeV
+#   (SMP-23-001 lowest threshold ~50 GeV) and how their PRESCALES were handled (prescale weights?).
+PHOTON_TRIGGERS = ["Photon200"]
+PHOTON_TRIGGER_DATA_STREAM = "EGamma"  # single-photon paths are recorded in the EGamma primary dataset
+
+
+def photon_trigger_mask(event, is_mc, triggers=PHOTON_TRIGGERS):
+    """
+    True for events that fired any single-photon trigger in `triggers`.
+    In data, only events from the EGamma stream are accepted, so the same event
+    cannot also enter the photon region from another primary dataset (e.g. Muon).
+    """
+    passed = np.zeros(len(event), dtype=bool)
+    for path in triggers:
+        if path in event.HLT.fields:
+            passed = passed | ak.to_numpy(event.HLT[path])
+        else:
+            warnings.warn(f"photon_trigger_mask: HLT path {path} not in this file")
+    if not is_mc:
+        # same stream parsing as common.trigger_rules
+        stream = re.split('[_/]', event.metadata['dataset'])[0].rstrip('0123456789')
+        if stream != PHOTON_TRIGGER_DATA_STREAM:
+            passed = np.zeros(len(event), dtype=bool)
+    return passed
 
 
 def photon_id_mask(photons, wp):
